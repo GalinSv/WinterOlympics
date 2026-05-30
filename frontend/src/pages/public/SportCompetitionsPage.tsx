@@ -1,0 +1,332 @@
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+import {
+    Alert,
+    Box,
+    Button,
+    Card,
+    CardActions,
+    CardContent,
+    Chip,
+    CircularProgress,
+    Snackbar,
+    Stack,
+    TextField,
+    ToggleButton,
+    ToggleButtonGroup,
+    Typography,
+} from "@mui/material";
+
+import type {
+    Competition,
+    Gender,
+} from "../../types/api";
+
+import { getCurrentAthlete } from "../../services/athleteService";
+import { registerForCompetition } from "../../services/registrationService";
+import { hasRole, isAuthenticated } from "../../utils/jwt";
+import { extractErrorMessage } from "../../utils/errors";
+
+type GenderFilter =
+    | "ALL"
+    | Gender;
+
+type SortOrder = "DATE_DESC" | "DATE_ASC";
+
+type Props<TCompetition extends Competition> = {
+    title: string;
+    description: string;
+    emptyMessage: string;
+    chipColor: "primary" | "success";
+    loadCompetitions: () => Promise<TCompetition[]>;
+    renderDetails: (competition: TCompetition) => string;
+};
+
+function getGenderLabel(gender: Gender) {
+    return gender === "MALE"
+        ? "Men"
+        : "Women";
+}
+
+function SportCompetitionsPage<TCompetition extends Competition>({
+    title,
+    description,
+    emptyMessage,
+    chipColor,
+    loadCompetitions,
+    renderDetails,
+}: Props<TCompetition>) {
+    const navigate = useNavigate();
+
+    const [competitions, setCompetitions] =
+        useState<TCompetition[]>([]);
+
+    const [genderFilter, setGenderFilter] =
+        useState<GenderFilter>("ALL");
+
+    const [search, setSearch] = useState("");
+    const [sortOrder, setSortOrder] = useState<SortOrder>("DATE_DESC");
+    const [athleteId, setAthleteId] = useState<number | null>(null);
+    const [busyId, setBusyId] = useState<number | null>(null);
+    const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+
+    const [loading, setLoading] =
+        useState(true);
+
+    const [error, setError] =
+        useState<string | null>(null);
+
+    const canRegister = isAuthenticated() && hasRole("ROLE_ATHLETE");
+
+    useEffect(() => {
+        loadCompetitions()
+            .then(setCompetitions)
+            .catch(() =>
+                setError("Could not load competitions.")
+            )
+            .finally(() => setLoading(false));
+    }, [loadCompetitions]);
+
+    useEffect(() => {
+        if (!canRegister) return;
+        getCurrentAthlete()
+            .then((me) => setAthleteId(me.id ?? null))
+            .catch(() => setAthleteId(null));
+    }, [canRegister]);
+
+    const filteredCompetitions = useMemo(() => {
+        let list = competitions;
+        if (genderFilter !== "ALL") {
+            list = list.filter((c) => c.gender === genderFilter);
+        }
+        const q = search.trim().toLowerCase();
+        if (q) {
+            list = list.filter((c) => c.name.toLowerCase().includes(q));
+        }
+        const sorted = [...list].sort((a, b) =>
+            sortOrder === "DATE_DESC"
+                ? b.date.localeCompare(a.date)
+                : a.date.localeCompare(b.date)
+        );
+        return sorted;
+    }, [competitions, genderFilter, search, sortOrder]);
+
+    async function handleRegister(competition: TCompetition) {
+        if (!athleteId) return;
+        setBusyId(competition.id);
+        try {
+            await registerForCompetition(athleteId, competition.id);
+            setToast({ msg: `Registered for ${competition.name}.`, ok: true });
+        } catch (e) {
+            setToast({
+                msg: extractErrorMessage(
+                    e,
+                    "Could not register. Check gender/age requirements."
+                ),
+                ok: false,
+            });
+        } finally {
+            setBusyId(null);
+        }
+    }
+
+    if (loading) {
+        return <CircularProgress />;
+    }
+
+    return (
+        <Box>
+            <Stack
+                spacing={2}
+                sx={{ mb: 3 }}
+            >
+                <Box>
+                    <Typography
+                        component="h1"
+                        variant="h4"
+                        sx={{ fontWeight: 700 }}
+                    >
+                        {title}
+                    </Typography>
+
+                    <Typography
+                        color="text.secondary"
+                        sx={{ mt: 1 }}
+                    >
+                        {description}
+                    </Typography>
+                </Box>
+
+                <Stack
+                    direction={{ xs: "column", md: "row" }}
+                    spacing={2}
+                    sx={{ alignItems: { md: "center" }, flexWrap: "wrap" }}
+                >
+                    <TextField
+                        size="small"
+                        label="Search by name"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        sx={{ minWidth: 240 }}
+                    />
+
+                    <ToggleButtonGroup
+                        value={genderFilter}
+                        exclusive
+                        onChange={(_e: unknown, value: GenderFilter | null) => {
+                            if (value) setGenderFilter(value);
+                        }}
+                        size="small"
+                        aria-label="gender filter"
+                    >
+                        <ToggleButton value="ALL">All</ToggleButton>
+                        <ToggleButton value="MALE">Men</ToggleButton>
+                        <ToggleButton value="FEMALE">Women</ToggleButton>
+                    </ToggleButtonGroup>
+
+                    <ToggleButtonGroup
+                        value={sortOrder}
+                        exclusive
+                        onChange={(_e: unknown, value: SortOrder | null) => {
+                            if (value) setSortOrder(value);
+                        }}
+                        size="small"
+                        aria-label="sort by date"
+                    >
+                        <ToggleButton value="DATE_DESC">Newest first</ToggleButton>
+                        <ToggleButton value="DATE_ASC">Oldest first</ToggleButton>
+                    </ToggleButtonGroup>
+                </Stack>
+            </Stack>
+
+            {error && (
+                <Alert
+                    severity="error"
+                    sx={{ mb: 2 }}
+                >
+                    {error}
+                </Alert>
+            )}
+
+            {!error && filteredCompetitions.length === 0 && (
+                <Alert severity="info">
+                    {emptyMessage}
+                </Alert>
+            )}
+
+            <Box
+                sx={{
+                    display: "grid",
+                    gridTemplateColumns:
+                        "repeat(auto-fit, minmax(260px, 1fr))",
+                    gap: 2,
+                }}
+            >
+                {filteredCompetitions.map((competition) => (
+                    <Card
+                        key={`${competition.sport}-${competition.id}`}
+                        variant="outlined"
+                        onClick={() =>
+                            navigate(
+                                `/rankings?sport=${competition.sport}&id=${competition.id}`
+                            )
+                        }
+                        sx={{ cursor: "pointer", "&:hover": { boxShadow: 3 } }}
+                    >
+                        <CardContent>
+                            <Stack spacing={1.25}>
+                                <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    useFlexGap
+                                    sx={{ flexWrap: "wrap" }}
+                                >
+                                    <Chip
+                                        label={getGenderLabel(
+                                            competition.gender
+                                        )}
+                                        size="small"
+                                        color={chipColor}
+                                    />
+
+                                    <Chip
+                                        label={`Minimum age ${competition.minimumAge}`}
+                                        size="small"
+                                        variant="outlined"
+                                    />
+                                    {competition.status && (
+                                        <Chip
+                                            label={competition.status}
+                                            size="small"
+                                            variant="outlined"
+                                            color={
+                                                competition.status === "FINISHED"
+                                                    ? "default"
+                                                    : "warning"
+                                            }
+                                        />
+                                    )}
+                                </Stack>
+
+                                <Typography
+                                    component="h2"
+                                    variant="h6"
+                                >
+                                    {competition.name}
+                                </Typography>
+
+                                <Typography color="text.secondary">
+                                    Date: {competition.date}
+                                </Typography>
+
+                                <Typography color="text.secondary">
+                                    {renderDetails(competition)}
+                                </Typography>
+                            </Stack>
+                        </CardContent>
+                        {canRegister && competition.status !== "FINISHED" && (
+                            <CardActions onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                    size="small"
+                                    variant="contained"
+                                    disabled={
+                                        !athleteId ||
+                                        busyId === competition.id
+                                    }
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRegister(competition);
+                                    }}
+                                >
+                                    {busyId === competition.id
+                                        ? "Registering..."
+                                        : "Register"}
+                                </Button>
+                            </CardActions>
+                        )}
+                    </Card>
+                ))}
+            </Box>
+
+            <Snackbar
+                open={Boolean(toast)}
+                autoHideDuration={4000}
+                onClose={() => setToast(null)}
+                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+            >
+                {toast ? (
+                    <Alert
+                        onClose={() => setToast(null)}
+                        severity={toast.ok ? "success" : "error"}
+                        variant="filled"
+                    >
+                        {toast.msg}
+                    </Alert>
+                ) : undefined}
+            </Snackbar>
+        </Box>
+    );
+}
+
+export default SportCompetitionsPage;
