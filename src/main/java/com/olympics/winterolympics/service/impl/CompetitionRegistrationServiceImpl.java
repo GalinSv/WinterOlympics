@@ -85,6 +85,13 @@ public class CompetitionRegistrationServiceImpl implements CompetitionRegistrati
     }
 
     @Override
+    public RegistrationResponseDto getRegistration(Long registrationId) {
+        CompetitionRegistration registration = registrationRepository.findById(registrationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Registration not found"));
+        return toDto(registration);
+    }
+
+    @Override
     public void cancelRegistration(Long registrationId) {
         CompetitionRegistration registration = registrationRepository.findById(registrationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Registration not found"));

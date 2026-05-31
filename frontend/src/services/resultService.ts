@@ -13,13 +13,6 @@ export async function getSlalomResults(competitionId: number) {
     return response.data.data;
 }
 
-export async function generateSlalomDemoResults(competitionId: number) {
-    const response = await axiosInstance.post<ApiResponse<SlalomResult[]>>(
-        `/slalom-results/demo/${competitionId}`
-    );
-    return response.data.data;
-}
-
 export async function saveSlalomFirstRun(
     registrationId: number,
     firstRunTime: number,
@@ -63,13 +56,6 @@ export async function calculateSlalomRanking(competitionId: number) {
 export async function getBiathlonResults(competitionId: number) {
     const response = await axiosInstance.get<ApiResponse<BiathlonResult[]>>(
         `/biathlon-results/${competitionId}`
-    );
-    return response.data.data;
-}
-
-export async function generateBiathlonDemoResults(competitionId: number) {
-    const response = await axiosInstance.post<ApiResponse<BiathlonResult[]>>(
-        `/biathlon-results/demo/${competitionId}`
     );
     return response.data.data;
 }

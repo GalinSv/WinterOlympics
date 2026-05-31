@@ -2,16 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
     Alert,
-    Autocomplete,
     Box,
     Button,
     Card,
     CardContent,
     Checkbox,
+    Chip,
     CircularProgress,
     FormControl,
     FormControlLabel,
-    IconButton,
     InputLabel,
     MenuItem,
     Select,
@@ -24,23 +23,10 @@ import {
     TableRow,
     TextField,
     Typography,
-    Chip,
 } from "@mui/material";
-import DeleteIcon from "@mui/icons-material/Delete";
 
-import {
-    getAllCompetitions,
-    runSlalomDemo,
-    runBiathlonDemo,
-    assignSlalomMedals,
-    assignBiathlonMedals,
-} from "../../services/competitionService";
-import {
-    getRegistrationsByCompetition,
-    registerForCompetition,
-    cancelRegistration,
-} from "../../services/registrationService";
-import { getAllAthletes } from "../../services/athleteService";
+import { getAllCompetitions } from "../../services/competitionService";
+import { getRegistrationsByCompetition } from "../../services/registrationService";
 import {
     calculateBiathlonRanking,
     calculateSlalomQualifications,
@@ -51,9 +37,9 @@ import {
     saveSlalomFirstRun,
     saveSlalomSecondRun,
 } from "../../services/resultService";
+import { notify } from "../../utils/notify";
 
 import type {
-    Athlete,
     BiathlonResult,
     Competition,
     Registration,
@@ -76,6 +62,10 @@ const EMPTY_ROW: RowState = {
     finished: true,
 };
 
+function genderLabel(gender: string) {
+    return gender === "MALE" ? "Men" : "Women";
+}
+
 function EnterResultsPage() {
     const [competitions, setCompetitions] = useState<Competition[]>([]);
     const [selectedKey, setSelectedKey] = useState("");
@@ -86,18 +76,14 @@ function EnterResultsPage() {
     const [loading, setLoading] = useState(true);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
-    const [message, setMessage] = useState("");
-    const [athletes, setAthletes] = useState<Athlete[]>([]);
-    const [athleteToAdd, setAthleteToAdd] = useState<Athlete | null>(null);
 
     useEffect(() => {
-        Promise.all([getAllCompetitions(), getAllAthletes()])
-            .then(([all, ath]) => {
+        getAllCompetitions()
+            .then((all) => {
                 setCompetitions(all);
-                setAthletes(ath);
                 if (all[0]) setSelectedKey(`${all[0].sport}:${all[0].id}`);
             })
-            .catch(() => setError("Could not load competitions or athletes."))
+            .catch(() => setError("Could not load competitions."))
             .finally(() => setLoading(false));
     }, []);
 
@@ -108,26 +94,50 @@ function EnterResultsPage() {
         );
     }, [competitions, selectedKey]);
 
+    const locked = selected?.status === "FINISHED";
+
     async function loadDetails() {
         if (!selected) return;
         setError("");
-        setMessage("");
         try {
             const regs = await getRegistrationsByCompetition(selected.id);
             setRegistrations(regs);
+
+            let slalom: SlalomResult[] = [];
+            let biathlon: BiathlonResult[] = [];
             if (selected.sport === "slalom") {
-                setSlalomResults(await getSlalomResults(selected.id));
+                slalom = await getSlalomResults(selected.id);
+                setSlalomResults(slalom);
                 setBiathlonResults([]);
             } else {
-                setBiathlonResults(await getBiathlonResults(selected.id));
+                biathlon = await getBiathlonResults(selected.id);
+                setBiathlonResults(biathlon);
                 setSlalomResults([]);
             }
+
+            // Seed each row from the saved result so the inputs and the
+            // "Finished?" checkbox reflect what is actually stored.
             const fresh: Record<number, RowState> = {};
-            regs.forEach((r) => (fresh[r.registrationId] = { ...EMPTY_ROW }));
+            regs.forEach((r) => {
+                const s = slalom.find(
+                    (x) => x.registrationId === r.registrationId
+                );
+                const b = biathlon.find(
+                    (x) => x.registrationId === r.registrationId
+                );
+                const existing = s ?? b;
+                fresh[r.registrationId] = {
+                    firstRunTime: s?.firstRunTime?.toString() ?? "",
+                    secondRunTime: s?.secondRunTime?.toString() ?? "",
+                    skiingTime: b?.skiingTime?.toString() ?? "",
+                    missedShots: b?.missedShots?.toString() ?? "0",
+                    finished: existing ? Boolean(existing.finished) : true,
+                };
+            });
             setRows(fresh);
         } catch (e) {
-            console.error(e);
             setError("Could not load registrations or results.");
+            notify.error(e, "Could not load registrations or results.");
         }
     }
 
@@ -156,16 +166,11 @@ function EnterResultsPage() {
         if (!row?.firstRunTime) return;
         setBusy(true);
         try {
-            await saveSlalomFirstRun(
-                regId,
-                Number(row.firstRunTime),
-                row.finished
-            );
-            setMessage("First-run time saved.");
+            await saveSlalomFirstRun(regId, Number(row.firstRunTime), row.finished);
+            notify.success("First-run time saved.");
             await loadDetails();
         } catch (e) {
-            console.error(e);
-            setError("Could not save first-run time.");
+            notify.error(e, "Could not save first-run time.");
         } finally {
             setBusy(false);
         }
@@ -176,16 +181,11 @@ function EnterResultsPage() {
         if (!row?.secondRunTime) return;
         setBusy(true);
         try {
-            await saveSlalomSecondRun(
-                regId,
-                Number(row.secondRunTime),
-                row.finished
-            );
-            setMessage("Second-run time saved.");
+            await saveSlalomSecondRun(regId, Number(row.secondRunTime), row.finished);
+            notify.success("Second-run time saved.");
             await loadDetails();
         } catch (e) {
-            console.error(e);
-            setError("Could not save second-run time.");
+            notify.error(e, "Could not save second-run time.");
         } finally {
             setBusy(false);
         }
@@ -202,11 +202,10 @@ function EnterResultsPage() {
                 Number(row.missedShots || "0"),
                 row.finished
             );
-            setMessage("Biathlon result saved.");
+            notify.success("Biathlon result saved.");
             await loadDetails();
         } catch (e) {
-            console.error(e);
-            setError("Could not save biathlon result.");
+            notify.error(e, "Could not save biathlon result.");
         } finally {
             setBusy(false);
         }
@@ -218,108 +217,16 @@ function EnterResultsPage() {
     ) {
         if (!selected) return;
         setBusy(true);
-        setError("");
-        setMessage("");
         try {
             await action();
-            setMessage(successMessage);
+            notify.success(successMessage);
             await loadDetails();
         } catch (e) {
-            console.error(e);
-            setError("Action failed.");
+            notify.error(e, "Action failed.");
         } finally {
             setBusy(false);
         }
     }
-
-    async function refreshCompetitions() {
-        try {
-            const all = await getAllCompetitions();
-            setCompetitions(all);
-        } catch (e) {
-            console.error(e);
-        }
-    }
-
-    async function handleGenerateDemo() {
-        if (!selected) return;
-        if (selected.status === "FINISHED") {
-            setError("Competition is already finalized.");
-            return;
-        }
-        setBusy(true);
-        setError("");
-        setMessage("");
-        try {
-            if (selected.sport === "slalom") {
-                await runSlalomDemo(selected.id);
-                await assignSlalomMedals(selected.id);
-            } else {
-                await runBiathlonDemo(selected.id);
-                await assignBiathlonMedals(selected.id);
-            }
-            setMessage(
-                "Demo completed: athletes registered, results generated, ranking calculated, medals awarded, competition finalized."
-            );
-            await refreshCompetitions();
-            await loadDetails();
-        } catch (e) {
-            console.error(e);
-            setError("Could not run demo. Make sure enough eligible athletes exist.");
-        } finally {
-            setBusy(false);
-        }
-    }
-
-    async function handleAddAthlete() {
-        if (!selected || !athleteToAdd?.id) return;
-        setBusy(true);
-        setError("");
-        setMessage("");
-        try {
-            await registerForCompetition(athleteToAdd.id, selected.id);
-            setMessage(`${athleteToAdd.name} added to ${selected.name}.`);
-            setAthleteToAdd(null);
-            await loadDetails();
-        } catch (e) {
-            console.error(e);
-            setError(
-                "Could not add athlete. Check gender/age requirements or if already registered."
-            );
-        } finally {
-            setBusy(false);
-        }
-    }
-
-    async function handleRemoveAthlete(registrationId: number) {
-        if (!selected) return;
-        setBusy(true);
-        setError("");
-        setMessage("");
-        try {
-            await cancelRegistration(registrationId);
-            setMessage("Athlete removed from competition.");
-            await loadDetails();
-        } catch (e) {
-            console.error(e);
-            setError("Could not remove athlete.");
-        } finally {
-            setBusy(false);
-        }
-    }
-
-    const eligibleAthletes = useMemo(() => {
-        if (!selected) return [] as Athlete[];
-        const registeredIds = new Set(
-            registrations.map((r) => r.athleteId)
-        );
-        return athletes.filter(
-            (a) =>
-                a.id !== undefined &&
-                !registeredIds.has(a.id) &&
-                a.gender === selected.gender
-        );
-    }, [athletes, registrations, selected]);
 
     if (loading) return <CircularProgress />;
 
@@ -335,9 +242,8 @@ function EnterResultsPage() {
 
             <Stack spacing={2}>
                 {error && <Alert severity="error">{error}</Alert>}
-                {message && <Alert severity="success">{message}</Alert>}
 
-                <Card variant="outlined">
+                <Card>
                     <CardContent>
                         <Stack
                             direction={{ xs: "column", md: "row" }}
@@ -367,129 +273,126 @@ function EnterResultsPage() {
                                 </Select>
                             </FormControl>
 
-                            {selected?.status && (
-                                <Chip
-                                    label={selected.status}
-                                    color={
-                                        selected.status === "FINISHED"
-                                            ? "default"
-                                            : "warning"
-                                    }
-                                    variant="outlined"
-                                />
-                            )}
-
-                            <Button
-                                variant="contained"
-                                color="secondary"
-                                disabled={busy || !selected || selected.status === "FINISHED"}
-                                onClick={handleGenerateDemo}
-                            >
-                                Generate Demo Results
-                            </Button>
-
-                            {selected?.sport === "slalom" && (
-                                <>
-                                    <Button
-                                        variant="outlined"
-                                        disabled={busy}
-                                        onClick={() =>
-                                            handleAction(
-                                                () =>
-                                                    calculateSlalomQualifications(
-                                                        selected.id
-                                                    ),
-                                                "Qualifications calculated."
-                                            )
+                            {selected && (
+                                <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    sx={{ flexWrap: "wrap" }}
+                                >
+                                    <Chip
+                                        label={
+                                            selected.sport === "slalom"
+                                                ? "Ski slalom"
+                                                : "Biathlon"
                                         }
-                                    >
-                                        Calculate qualifications
-                                    </Button>
+                                        color="primary"
+                                    />
+                                    <Chip
+                                        label={genderLabel(selected.gender)}
+                                        variant="outlined"
+                                    />
+                                    <Chip
+                                        label={`Min age ${selected.minimumAge}`}
+                                        variant="outlined"
+                                    />
+                                    {selected.status && (
+                                        <Chip
+                                            label={selected.status}
+                                            color={
+                                                locked ? "default" : "warning"
+                                            }
+                                            variant="outlined"
+                                        />
+                                    )}
+                                </Stack>
+                            )}
+                        </Stack>
+
+                        {selected && (
+                            <Typography
+                                variant="h6"
+                                sx={{ mt: 2 }}
+                            >
+                                {selected.name}
+                            </Typography>
+                        )}
+
+                        {selected && (
+                            <Stack
+                                direction="row"
+                                spacing={1.5}
+                                sx={{ mt: 2, flexWrap: "wrap" }}
+                            >
+                                {selected.sport === "slalom" && (
+                                    <>
+                                        <Button
+                                            variant="outlined"
+                                            disabled={busy || locked}
+                                            onClick={() =>
+                                                handleAction(
+                                                    () =>
+                                                        calculateSlalomQualifications(
+                                                            selected.id
+                                                        ),
+                                                    "Qualifications calculated."
+                                                )
+                                            }
+                                        >
+                                            Calculate qualifications
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            disabled={busy || locked}
+                                            onClick={() =>
+                                                handleAction(
+                                                    () =>
+                                                        calculateSlalomRanking(
+                                                            selected.id
+                                                        ),
+                                                    "Final ranking calculated."
+                                                )
+                                            }
+                                        >
+                                            Calculate ranking
+                                        </Button>
+                                    </>
+                                )}
+                                {selected.sport === "biathlon" && (
                                     <Button
                                         variant="outlined"
-                                        disabled={busy}
+                                        disabled={busy || locked}
                                         onClick={() =>
                                             handleAction(
                                                 () =>
-                                                    calculateSlalomRanking(
+                                                    calculateBiathlonRanking(
                                                         selected.id
                                                     ),
-                                                "Final ranking calculated."
+                                                "Ranking calculated."
                                             )
                                         }
                                     >
                                         Calculate ranking
                                     </Button>
-                                </>
-                            )}
-
-                            {selected?.sport === "biathlon" && (
-                                <Button
-                                    variant="outlined"
-                                    disabled={busy}
-                                    onClick={() =>
-                                        handleAction(
-                                            () =>
-                                                calculateBiathlonRanking(
-                                                    selected.id
-                                                ),
-                                            "Ranking calculated."
-                                        )
-                                    }
-                                >
-                                    Calculate ranking
-                                </Button>
-                            )}
-                        </Stack>
+                                )}
+                            </Stack>
+                        )}
                     </CardContent>
                 </Card>
 
-                {selected && selected.status !== "FINISHED" && (
-                    <Card variant="outlined">
-                        <CardContent>
-                            <Typography variant="h6" sx={{ mb: 1.5 }}>
-                                Manage participants
-                            </Typography>
-                            <Stack
-                                direction={{ xs: "column", md: "row" }}
-                                spacing={2}
-                                sx={{ alignItems: { md: "center" } }}
-                            >
-                                <Autocomplete
-                                    sx={{ minWidth: 320, flex: 1 }}
-                                    options={eligibleAthletes}
-                                    value={athleteToAdd}
-                                    onChange={(_e, v) => setAthleteToAdd(v)}
-                                    getOptionLabel={(a) =>
-                                        `${a.name} — ${a.country.replace(/_/g, " ")} (${a.gender})`
-                                    }
-                                    isOptionEqualToValue={(a, b) => a.id === b.id}
-                                    renderInput={(params) => (
-                                        <TextField
-                                            {...params}
-                                            label="Search athlete to add"
-                                            size="small"
-                                        />
-                                    )}
-                                />
-                                <Button
-                                    variant="contained"
-                                    disabled={busy || !athleteToAdd}
-                                    onClick={handleAddAthlete}
-                                >
-                                    Add to competition
-                                </Button>
-                            </Stack>
-                        </CardContent>
-                    </Card>
+                {locked && (
+                    <Alert severity="info">
+                        This competition is finalized. Results are read-only.
+                    </Alert>
                 )}
 
                 {selected && (
-                    <Card variant="outlined">
+                    <Card>
                         <CardContent>
                             {registrations.length === 0 ? (
                                 <Alert severity="info">
-                                    No athletes are registered for this competition.
+                                    No athletes are registered for this
+                                    competition. Add participants from Manage
+                                    Competitions.
                                 </Alert>
                             ) : (
                                 <TableContainer>
@@ -536,7 +439,10 @@ function EnterResultsPage() {
                                                             {reg.athleteName}
                                                         </TableCell>
                                                         <TableCell>
-                                                            {reg.country}
+                                                            {(reg.country ?? "").replace(
+                                                                /_/g,
+                                                                " "
+                                                            )}
                                                         </TableCell>
 
                                                         {selected.sport ===
@@ -546,18 +452,16 @@ function EnterResultsPage() {
                                                                     <TextField
                                                                         size="small"
                                                                         type="number"
+                                                                        disabled={locked}
                                                                         value={
-                                                                            row.firstRunTime ||
-                                                                            (slalom?.firstRunTime?.toString() ??
-                                                                                "")
+                                                                            row.firstRunTime
                                                                         }
                                                                         onChange={(e) =>
                                                                             update(
                                                                                 reg.registrationId,
                                                                                 {
                                                                                     firstRunTime:
-                                                                                        e.target
-                                                                                            .value,
+                                                                                        e.target.value,
                                                                                 }
                                                                             )
                                                                         }
@@ -568,20 +472,18 @@ function EnterResultsPage() {
                                                                         size="small"
                                                                         type="number"
                                                                         disabled={
+                                                                            locked ||
                                                                             !slalom?.qualifiedForSecondRun
                                                                         }
                                                                         value={
-                                                                            row.secondRunTime ||
-                                                                            (slalom?.secondRunTime?.toString() ??
-                                                                                "")
+                                                                            row.secondRunTime
                                                                         }
                                                                         onChange={(e) =>
                                                                             update(
                                                                                 reg.registrationId,
                                                                                 {
                                                                                     secondRunTime:
-                                                                                        e.target
-                                                                                            .value,
+                                                                                        e.target.value,
                                                                                 }
                                                                             )
                                                                         }
@@ -603,18 +505,16 @@ function EnterResultsPage() {
                                                                     <TextField
                                                                         size="small"
                                                                         type="number"
+                                                                        disabled={locked}
                                                                         value={
-                                                                            row.skiingTime ||
-                                                                            (biathlon?.skiingTime?.toString() ??
-                                                                                "")
+                                                                            row.skiingTime
                                                                         }
                                                                         onChange={(e) =>
                                                                             update(
                                                                                 reg.registrationId,
                                                                                 {
                                                                                     skiingTime:
-                                                                                        e.target
-                                                                                            .value,
+                                                                                        e.target.value,
                                                                                 }
                                                                             )
                                                                         }
@@ -624,18 +524,16 @@ function EnterResultsPage() {
                                                                     <TextField
                                                                         size="small"
                                                                         type="number"
+                                                                        disabled={locked}
                                                                         value={
-                                                                            row.missedShots ||
-                                                                            (biathlon?.missedShots?.toString() ??
-                                                                                "0")
+                                                                            row.missedShots
                                                                         }
                                                                         onChange={(e) =>
                                                                             update(
                                                                                 reg.registrationId,
                                                                                 {
                                                                                     missedShots:
-                                                                                        e.target
-                                                                                            .value,
+                                                                                        e.target.value,
                                                                                 }
                                                                             )
                                                                         }
@@ -657,6 +555,7 @@ function EnterResultsPage() {
                                                             <FormControlLabel
                                                                 control={
                                                                     <Checkbox
+                                                                        disabled={locked}
                                                                         checked={
                                                                             row.finished
                                                                         }
@@ -665,8 +564,7 @@ function EnterResultsPage() {
                                                                                 reg.registrationId,
                                                                                 {
                                                                                     finished:
-                                                                                        e.target
-                                                                                            .checked,
+                                                                                        e.target.checked,
                                                                                 }
                                                                             )
                                                                         }
@@ -681,11 +579,16 @@ function EnterResultsPage() {
                                                                 <Stack
                                                                     direction="row"
                                                                     spacing={1}
-                                                                    sx={{ justifyContent: "flex-end" }}
+                                                                    sx={{
+                                                                        justifyContent:
+                                                                            "flex-end",
+                                                                    }}
                                                                 >
                                                                     <Button
                                                                         size="small"
-                                                                        disabled={busy}
+                                                                        disabled={
+                                                                            busy || locked
+                                                                        }
                                                                         onClick={() =>
                                                                             handleSaveSlalomFirst(
                                                                                 reg.registrationId
@@ -698,6 +601,7 @@ function EnterResultsPage() {
                                                                         size="small"
                                                                         disabled={
                                                                             busy ||
+                                                                            locked ||
                                                                             !slalom?.qualifiedForSecondRun
                                                                         }
                                                                         onClick={() =>
@@ -708,51 +612,21 @@ function EnterResultsPage() {
                                                                     >
                                                                         Save R2
                                                                     </Button>
-                                                                    <IconButton
-                                                                        size="small"
-                                                                        color="error"
-                                                                        disabled={busy || selected.status === "FINISHED"}
-                                                                        onClick={() =>
-                                                                            handleRemoveAthlete(
-                                                                                reg.registrationId
-                                                                            )
-                                                                        }
-                                                                        aria-label="remove athlete"
-                                                                    >
-                                                                        <DeleteIcon fontSize="small" />
-                                                                    </IconButton>
                                                                 </Stack>
                                                             ) : (
-                                                                <Stack
-                                                                    direction="row"
-                                                                    spacing={1}
-                                                                    sx={{ justifyContent: "flex-end" }}
+                                                                <Button
+                                                                    size="small"
+                                                                    disabled={
+                                                                        busy || locked
+                                                                    }
+                                                                    onClick={() =>
+                                                                        handleSaveBiathlon(
+                                                                            reg.registrationId
+                                                                        )
+                                                                    }
                                                                 >
-                                                                    <Button
-                                                                        size="small"
-                                                                        disabled={busy}
-                                                                        onClick={() =>
-                                                                            handleSaveBiathlon(
-                                                                                reg.registrationId
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        Save
-                                                                    </Button>
-                                                                    <IconButton
-                                                                        size="small"
-                                                                        color="error"
-                                                                        disabled={busy || selected.status === "FINISHED"}
-                                                                        onClick={() =>
-                                                                            handleRemoveAthlete(
-                                                                                reg.registrationId
-                                                                            )
-                                                                        }
-                                                                        aria-label="remove athlete"
-                                                                    >
-                                                                        <DeleteIcon fontSize="small" />
-                                                                    </IconButton>
-                                                                </Stack>
+                                                                    Save
+                                                                </Button>
                                                             )}
                                                         </TableCell>
                                                     </TableRow>

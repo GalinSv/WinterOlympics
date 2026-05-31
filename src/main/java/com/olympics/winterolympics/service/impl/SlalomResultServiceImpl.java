@@ -44,11 +44,15 @@ public class SlalomResultServiceImpl
             throw new CompetitionLockedException("Competition is finalized; results cannot be modified.");
         }
 
-        SlalomResult result = new SlalomResult();
+        SlalomResult result =
+                slalomResultRepository
+                        .findByRegistrationId(registrationId)
+                        .orElseGet(SlalomResult::new);
 
         result.setRegistration(registration);
-        result.setFirstRunTime(firstRunTime);
+        result.setFirstRunTime(roundOrNull(firstRunTime));
         result.setFinished(finished);
+        recomputeTotalTime(result);
 
         slalomResultRepository.save(result);
 
@@ -59,39 +63,62 @@ public class SlalomResultServiceImpl
     public List<SlalomResultDto> calculateQualifiedAthletes(
             Long competitionId) {
 
-        List<SlalomResult> qualifiedResults =
-                slalomResultRepository.findAll()
-                        .stream()
+        List<SlalomResult> results =
+                slalomResultRepository
+                        .findByRegistrationCompetitionId(competitionId);
+
+        if (results.isEmpty()) {
+            return List.of();
+        }
+
+        SlalomCompetition competition =
+                (SlalomCompetition)
+                        results.get(0)
+                                .getRegistration()
+                                .getCompetition();
+
+        // Recalculate from scratch so the operation is repeatable.
+        results.forEach(result -> {
+            result.setQualifiedForSecondRun(false);
+            result.setSecondRunStartOrder(null);
+        });
+
+        List<SlalomResult> firstRunFinishers =
+                results.stream()
                         .filter(result ->
-                                result.getRegistration()
-                                        .getCompetition()
-                                        .getId()
-                                        .equals(competitionId))
-                        .filter(SlalomResult::getFinished)
+                                Boolean.TRUE.equals(result.getFinished()))
+                        .filter(result ->
+                                result.getFirstRunTime() != null)
                         .sorted(Comparator.comparing(
                                 SlalomResult::getFirstRunTime))
                         .toList();
 
-        SlalomCompetition competition =
-                (SlalomCompetition)
-                        qualifiedResults.get(0)
-                                .getRegistration()
-                                .getCompetition();
-
         int qualifiedCount =
-                competition.getSecondRunQualifiedCount();
+                competition.getSecondRunQualifiedCount() == null
+                        ? firstRunFinishers.size()
+                        : Math.max(competition.getSecondRunQualifiedCount(), 0);
 
-        List<SlalomResult> finalQualified =
-                qualifiedResults.stream()
+        List<SlalomResult> qualified =
+                firstRunFinishers.stream()
                         .limit(qualifiedCount)
                         .toList();
 
-        finalQualified.forEach(result ->
-                result.setQualifiedForSecondRun(true));
+        // Second-run start order: the slowest qualifier from run one starts first.
+        List<SlalomResult> startOrder =
+                qualified.stream()
+                        .sorted(Comparator.comparing(
+                                SlalomResult::getFirstRunTime).reversed())
+                        .toList();
 
-        slalomResultRepository.saveAll(finalQualified);
+        for (int i = 0; i < startOrder.size(); i++) {
+            SlalomResult result = startOrder.get(i);
+            result.setQualifiedForSecondRun(true);
+            result.setSecondRunStartOrder(i + 1);
+        }
 
-        return finalQualified.stream()
+        slalomResultRepository.saveAll(results);
+
+        return startOrder.stream()
                 .map(this::mapToDto)
                 .toList();
     }
@@ -103,13 +130,8 @@ public class SlalomResultServiceImpl
             Boolean finished) {
 
         SlalomResult result =
-                slalomResultRepository.findAll()
-                        .stream()
-                        .filter(r ->
-                                r.getRegistration()
-                                        .getId()
-                                        .equals(registrationId))
-                        .findFirst()
+                slalomResultRepository
+                        .findByRegistrationId(registrationId)
                         .orElseThrow(() ->
                                 new ResourceNotFoundException(
                                         "Result not found"));
@@ -118,19 +140,9 @@ public class SlalomResultServiceImpl
             throw new CompetitionLockedException("Competition is finalized; results cannot be modified.");
         }
 
-        result.setSecondRunTime(secondRunTime);
+        result.setSecondRunTime(roundOrNull(secondRunTime));
         result.setFinished(finished);
-
-        if (finished &&
-                result.getFirstRunTime() != null &&
-                secondRunTime != null) {
-
-            result.setTotalTime(
-                    result.getFirstRunTime()
-                            + secondRunTime);
-        } else {
-            result.setTotalTime(null);
-        }
+        recomputeTotalTime(result);
 
         slalomResultRepository.save(result);
 
@@ -200,7 +212,7 @@ public class SlalomResultServiceImpl
 
             result.setRegistration(registration);
             result.setFirstRunTime(
-                    randomTime(48, 86));
+                    randomTime(45, 90));
             result.setSecondRunTime(null);
             result.setTotalTime(null);
             result.setFinalRank(null);
@@ -249,7 +261,7 @@ public class SlalomResultServiceImpl
 
             if (secondRunFinished) {
                 result.setSecondRunTime(
-                        randomTime(48, 86));
+                        randomTime(45, 90));
                 result.setTotalTime(
                         roundToMilliseconds(
                                 result.getFirstRunTime()
@@ -364,5 +376,27 @@ public class SlalomResultServiceImpl
     private double roundToMilliseconds(double value) {
 
         return Math.round(value * 1000.0) / 1000.0;
+    }
+
+    private Double roundOrNull(Double value) {
+
+        return value == null
+                ? null
+                : roundToMilliseconds(value);
+    }
+
+    private void recomputeTotalTime(SlalomResult result) {
+
+        if (Boolean.TRUE.equals(result.getFinished())
+                && result.getFirstRunTime() != null
+                && result.getSecondRunTime() != null) {
+
+            result.setTotalTime(
+                    roundToMilliseconds(
+                            result.getFirstRunTime()
+                                    + result.getSecondRunTime()));
+        } else {
+            result.setTotalTime(null);
+        }
     }
 }

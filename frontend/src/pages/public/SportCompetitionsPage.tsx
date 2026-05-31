@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
@@ -10,7 +10,6 @@ import {
     CardContent,
     Chip,
     CircularProgress,
-    Snackbar,
     Stack,
     TextField,
     ToggleButton,
@@ -24,9 +23,13 @@ import type {
 } from "../../types/api";
 
 import { getCurrentAthlete } from "../../services/athleteService";
-import { registerForCompetition } from "../../services/registrationService";
+import {
+    registerForCompetition,
+    getRegistrationsByAthlete,
+    cancelRegistration,
+} from "../../services/registrationService";
 import { hasRole, isAuthenticated } from "../../utils/jwt";
-import { extractErrorMessage } from "../../utils/errors";
+import { notify } from "../../utils/notify";
 
 type GenderFilter =
     | "ALL"
@@ -68,8 +71,10 @@ function SportCompetitionsPage<TCompetition extends Competition>({
     const [search, setSearch] = useState("");
     const [sortOrder, setSortOrder] = useState<SortOrder>("DATE_DESC");
     const [athleteId, setAthleteId] = useState<number | null>(null);
+    const [registrations, setRegistrations] = useState<
+        Record<number, { registrationId: number; status: string }>
+    >({});
     const [busyId, setBusyId] = useState<number | null>(null);
-    const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
     const [loading, setLoading] =
         useState(true);
@@ -95,6 +100,28 @@ function SportCompetitionsPage<TCompetition extends Competition>({
             .catch(() => setAthleteId(null));
     }, [canRegister]);
 
+    const loadRegistrations = useCallback((id: number) => {
+        getRegistrationsByAthlete(id)
+            .then((regs) => {
+                const map: Record<
+                    number,
+                    { registrationId: number; status: string }
+                > = {};
+                for (const r of regs) {
+                    map[r.competitionId] = {
+                        registrationId: r.registrationId,
+                        status: r.status,
+                    };
+                }
+                setRegistrations(map);
+            })
+            .catch(() => setRegistrations({}));
+    }, []);
+
+    useEffect(() => {
+        if (athleteId) loadRegistrations(athleteId);
+    }, [athleteId, loadRegistrations]);
+
     const filteredCompetitions = useMemo(() => {
         let list = competitions;
         if (genderFilter !== "ALL") {
@@ -117,15 +144,26 @@ function SportCompetitionsPage<TCompetition extends Competition>({
         setBusyId(competition.id);
         try {
             await registerForCompetition(athleteId, competition.id);
-            setToast({ msg: `Registered for ${competition.name}.`, ok: true });
+            notify.success(`Registered for ${competition.name}.`);
+            loadRegistrations(athleteId);
         } catch (e) {
-            setToast({
-                msg: extractErrorMessage(
-                    e,
-                    "Could not register. Check gender/age requirements."
-                ),
-                ok: false,
-            });
+            notify.error(e, "Could not register for this competition.");
+        } finally {
+            setBusyId(null);
+        }
+    }
+
+    async function handleUnregister(competition: TCompetition) {
+        if (!athleteId) return;
+        const registration = registrations[competition.id];
+        if (!registration) return;
+        setBusyId(competition.id);
+        try {
+            await cancelRegistration(registration.registrationId);
+            notify.success(`Unregistered from ${competition.name}.`);
+            loadRegistrations(athleteId);
+        } catch (e) {
+            notify.error(e, "Could not unregister from this competition.");
         } finally {
             setBusyId(null);
         }
@@ -267,6 +305,16 @@ function SportCompetitionsPage<TCompetition extends Competition>({
                                             }
                                         />
                                     )}
+                                    {registrations[competition.id] && (
+                                        <Chip
+                                            label={`Registered · ${
+                                                registrations[competition.id]
+                                                    .status
+                                            }`}
+                                            size="small"
+                                            color="success"
+                                        />
+                                    )}
                                 </Stack>
 
                                 <Typography
@@ -287,44 +335,47 @@ function SportCompetitionsPage<TCompetition extends Competition>({
                         </CardContent>
                         {canRegister && competition.status !== "FINISHED" && (
                             <CardActions onClick={(e) => e.stopPropagation()}>
-                                <Button
-                                    size="small"
-                                    variant="contained"
-                                    disabled={
-                                        !athleteId ||
-                                        busyId === competition.id
-                                    }
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleRegister(competition);
-                                    }}
-                                >
-                                    {busyId === competition.id
-                                        ? "Registering..."
-                                        : "Register"}
-                                </Button>
+                                {registrations[competition.id] ? (
+                                    <Button
+                                        size="small"
+                                        color="error"
+                                        variant="outlined"
+                                        disabled={
+                                            !athleteId ||
+                                            busyId === competition.id
+                                        }
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleUnregister(competition);
+                                        }}
+                                    >
+                                        {busyId === competition.id
+                                            ? "Working..."
+                                            : "Unregister"}
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        size="small"
+                                        variant="contained"
+                                        disabled={
+                                            !athleteId ||
+                                            busyId === competition.id
+                                        }
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRegister(competition);
+                                        }}
+                                    >
+                                        {busyId === competition.id
+                                            ? "Registering..."
+                                            : "Register"}
+                                    </Button>
+                                )}
                             </CardActions>
                         )}
                     </Card>
                 ))}
             </Box>
-
-            <Snackbar
-                open={Boolean(toast)}
-                autoHideDuration={4000}
-                onClose={() => setToast(null)}
-                anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-            >
-                {toast ? (
-                    <Alert
-                        onClose={() => setToast(null)}
-                        severity={toast.ok ? "success" : "error"}
-                        variant="filled"
-                    >
-                        {toast.msg}
-                    </Alert>
-                ) : undefined}
-            </Snackbar>
         </Box>
     );
 }

@@ -28,7 +28,7 @@ import {
 } from "../../services/athleteService";
 import { getAllCompetitions } from "../../services/competitionService";
 import { registerForCompetition } from "../../services/registrationService";
-import { extractErrorMessage } from "../../utils/errors";
+import { notify } from "../../utils/notify";
 
 import type { Athlete, Competition, Country, Gender } from "../../types/api";
 import { COUNTRIES } from "../../types/api";
@@ -39,7 +39,6 @@ function AthleteDashboard() {
     const [selectedKey, setSelectedKey] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [message, setMessage] = useState("");
     const [busy, setBusy] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [editForm, setEditForm] = useState<Athlete | null>(null);
@@ -60,17 +59,13 @@ function AthleteDashboard() {
         if (!athlete?.id || !selectedKey) return;
         const [, id] = selectedKey.split(":");
         setBusy(true);
-        setError("");
-        setMessage("");
         try {
             await registerForCompetition(athlete.id, Number(id));
-            setMessage("You are registered.");
+            notify.success("You are registered.");
         } catch (e) {
-            const err = e as { response?: { data?: { message?: string } } };
-            console.error(err);
-            setError(
-                err.response?.data?.message ||
-                    "Could not register. Check gender/age requirements."
+            notify.error(
+                e,
+                "Could not register. Check gender and minimum-age requirements."
             );
         } finally {
             setBusy(false);
@@ -86,15 +81,13 @@ function AthleteDashboard() {
     async function handleSaveProfile() {
         if (!editForm) return;
         setSavingEdit(true);
-        setError("");
-        setMessage("");
         try {
             const updated = await updateMyProfile(editForm);
             setAthlete(updated);
-            setMessage("Profile updated.");
+            notify.success("Profile updated.");
             setEditOpen(false);
         } catch (e) {
-            setError(extractErrorMessage(e, "Could not update profile."));
+            notify.error(e, "Could not update profile.");
         } finally {
             setSavingEdit(false);
         }
@@ -114,7 +107,6 @@ function AthleteDashboard() {
 
             <Stack spacing={2}>
                 {error && <Alert severity="error">{error}</Alert>}
-                {message && <Alert severity="success">{message}</Alert>}
 
                 {athlete && (
                     <Card variant="outlined">

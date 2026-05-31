@@ -16,6 +16,7 @@ import {
 } from "react-router-dom";
 
 import { login } from "../../services/authService";
+import { notify } from "../../utils/notify";
 
 function LoginPage() {
 
@@ -37,11 +38,12 @@ function LoginPage() {
 
             await login(username, password);
 
+            notify.success("Logged in successfully.");
             navigate("/");
 
         } catch (error) {
 
-            console.error(error);
+            notify.error(error, "Login failed. Check username and password.");
 
             setErrorMessage(
                 "Login failed. Check username and password."

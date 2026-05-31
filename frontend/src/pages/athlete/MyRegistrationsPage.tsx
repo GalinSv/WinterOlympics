@@ -22,6 +22,7 @@ import {
     cancelRegistration,
     getRegistrationsByAthlete,
 } from "../../services/registrationService";
+import { notify } from "../../utils/notify";
 
 import type { Registration } from "../../types/api";
 
@@ -29,7 +30,6 @@ function MyRegistrationsPage() {
     const [registrations, setRegistrations] = useState<Registration[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [message, setMessage] = useState("");
     const [athleteId, setAthleteId] = useState<number | null>(null);
 
     function load(id: number) {
@@ -59,11 +59,10 @@ function MyRegistrationsPage() {
             return;
         try {
             await cancelRegistration(reg.registrationId);
-            setMessage("Registration cancelled.");
+            notify.success("Registration cancelled.");
             load(athleteId);
         } catch (e) {
-            console.error(e);
-            setError("Could not cancel registration.");
+            notify.error(e, "Could not cancel registration.");
         }
     }
 
@@ -81,7 +80,6 @@ function MyRegistrationsPage() {
 
             <Stack spacing={2}>
                 {error && <Alert severity="error">{error}</Alert>}
-                {message && <Alert severity="success">{message}</Alert>}
 
                 <Card variant="outlined">
                     <CardContent>

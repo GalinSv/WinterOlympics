@@ -13,5 +13,7 @@ public interface CompetitionRegistrationService {
 
     List<RegistrationResponseDto> getRegistrationsByAthlete(Long athleteId);
 
+    RegistrationResponseDto getRegistration(Long registrationId);
+
     void cancelRegistration(Long registrationId);
 }

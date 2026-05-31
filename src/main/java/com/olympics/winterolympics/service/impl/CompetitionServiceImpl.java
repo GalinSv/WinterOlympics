@@ -8,7 +8,11 @@ import com.olympics.winterolympics.entity.SlalomCompetition;
 import com.olympics.winterolympics.enums.CompetitionStatus;
 import com.olympics.winterolympics.exception.CompetitionLockedException;
 import com.olympics.winterolympics.exception.ResourceNotFoundException;
+import com.olympics.winterolympics.repository.BiathlonResultRepository;
+import com.olympics.winterolympics.repository.CompetitionRegistrationRepository;
 import com.olympics.winterolympics.repository.CompetitionRepository;
+import com.olympics.winterolympics.repository.MedalResultRepository;
+import com.olympics.winterolympics.repository.SlalomResultRepository;
 import com.olympics.winterolympics.service.CompetitionService;
 import com.olympics.winterolympics.service.MedalResultService;
 import com.olympics.winterolympics.service.SlalomResultService;
@@ -25,6 +29,10 @@ import java.util.List;
 public class CompetitionServiceImpl implements CompetitionService {
 
     private final CompetitionRepository competitionRepository;
+    private final CompetitionRegistrationRepository registrationRepository;
+    private final SlalomResultRepository slalomResultRepository;
+    private final BiathlonResultRepository biathlonResultRepository;
+    private final MedalResultRepository medalResultRepository;
     private final MedalResultService medalResultService;
     @Lazy
     private final SlalomResultService slalomResultService;
@@ -66,8 +74,9 @@ public class CompetitionServiceImpl implements CompetitionService {
     }
 
     @Override
+    @Transactional
     public void deleteSlalomCompetition(Long id) {
-        competitionRepository.deleteById(id);
+        cascadeDelete(id);
     }
 
     @Override
@@ -105,8 +114,25 @@ public class CompetitionServiceImpl implements CompetitionService {
     }
 
     @Override
+    @Transactional
     public void deleteBiathlonCompetition(Long id) {
-        competitionRepository.deleteById(id);
+        cascadeDelete(id);
+    }
+
+    /**
+     * Removes a competition together with everything that references it:
+     * medals, results and registrations. Without this, deleting a competition
+     * that already has data fails on foreign-key constraints.
+     */
+    private void cascadeDelete(Long competitionId) {
+        medalResultRepository.deleteByCompetitionId(competitionId);
+        slalomResultRepository.deleteAll(
+                slalomResultRepository.findByRegistrationCompetitionId(competitionId));
+        biathlonResultRepository.deleteAll(
+                biathlonResultRepository.findByRegistrationCompetitionId(competitionId));
+        registrationRepository.deleteAll(
+                registrationRepository.findByCompetitionId(competitionId));
+        competitionRepository.deleteById(competitionId);
     }
 
     @Override

@@ -50,23 +50,23 @@ public class BiathlonResultServiceImpl
                         registration.getCompetition();
 
         BiathlonResult result =
-                new BiathlonResult();
-
-        result.setRegistration(registration);
-        result.setSkiingTime(skiingTime);
-        result.setMissedShots(missedShots);
-        result.setFinished(finished);
+                biathlonResultRepository
+                        .findByRegistrationId(registrationId)
+                        .orElseGet(BiathlonResult::new);
 
         double penaltySeconds =
                 missedShots
                         * competition.getPenaltySeconds();
 
-        result.setPenaltySeconds(
-                penaltySeconds);
+        result.setRegistration(registration);
+        result.setSkiingTime(roundOrNull(skiingTime));
+        result.setMissedShots(missedShots);
+        result.setFinished(finished);
+        result.setPenaltySeconds(penaltySeconds);
 
         result.setTotalTime(
                 Boolean.TRUE.equals(finished)
-                        ? skiingTime + penaltySeconds
+                        ? roundToMilliseconds(skiingTime + penaltySeconds)
                         : null);
 
         biathlonResultRepository.save(result);
@@ -274,5 +274,12 @@ public class BiathlonResultServiceImpl
     private double roundToMilliseconds(double value) {
 
         return Math.round(value * 1000.0) / 1000.0;
+    }
+
+    private Double roundOrNull(Double value) {
+
+        return value == null
+                ? null
+                : roundToMilliseconds(value);
     }
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
     Alert,
+    Autocomplete,
     Box,
     Button,
     Card,
@@ -11,7 +12,9 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
+    Divider,
     FormControl,
+    IconButton,
     InputLabel,
     MenuItem,
     Select,
@@ -27,6 +30,7 @@ import {
     ToggleButtonGroup,
     Typography,
 } from "@mui/material";
+import DeleteIcon from "@mui/icons-material/Delete";
 
 import {
     assignBiathlonMedals,
@@ -41,11 +45,19 @@ import {
     updateBiathlonCompetition,
     updateSlalomCompetition,
 } from "../../services/competitionService";
-import { extractErrorMessage } from "../../utils/errors";
+import { getAllAthletes } from "../../services/athleteService";
+import {
+    cancelRegistration,
+    getRegistrationsByCompetition,
+    registerForCompetition,
+} from "../../services/registrationService";
+import { notify } from "../../utils/notify";
 
 import type {
+    Athlete,
     Competition,
     Gender,
+    Registration,
     SportType,
 } from "../../types/api";
 
@@ -77,7 +89,6 @@ function CreateCompetitionPage() {
     const [competitions, setCompetitions] = useState<Competition[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [message, setMessage] = useState("");
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Competition | null>(null);
     const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -87,6 +98,13 @@ function CreateCompetitionPage() {
         "DATE_DESC"
     );
     const [finalizingId, setFinalizingId] = useState<number | null>(null);
+
+    const [allAthletes, setAllAthletes] = useState<Athlete[]>([]);
+    const [participantsComp, setParticipantsComp] =
+        useState<Competition | null>(null);
+    const [participants, setParticipants] = useState<Registration[]>([]);
+    const [athleteToAdd, setAthleteToAdd] = useState<Athlete | null>(null);
+    const [participantsBusy, setParticipantsBusy] = useState(false);
 
     const visibleCompetitions = useMemo(() => {
         let list = competitions;
@@ -108,6 +126,70 @@ function CreateCompetitionPage() {
     }
 
     useEffect(load, []);
+
+    useEffect(() => {
+        getAllAthletes()
+            .then((list) => setAllAthletes(Array.isArray(list) ? list : []))
+            .catch(() => setAllAthletes([]));
+    }, []);
+
+    async function openParticipants(c: Competition) {
+        setParticipantsComp(c);
+        setAthleteToAdd(null);
+        try {
+            setParticipants(await getRegistrationsByCompetition(c.id));
+        } catch (e) {
+            notify.error(e, "Could not load participants.");
+            setParticipants([]);
+        }
+    }
+
+    const eligibleAthletes = useMemo(() => {
+        if (!participantsComp) return [] as Athlete[];
+        const registeredIds = new Set(participants.map((r) => r.athleteId));
+        return allAthletes.filter(
+            (a) =>
+                a.id !== undefined &&
+                !registeredIds.has(a.id) &&
+                a.gender === participantsComp.gender
+        );
+    }, [allAthletes, participants, participantsComp]);
+
+    async function handleAddParticipant() {
+        if (!participantsComp || !athleteToAdd?.id) return;
+        setParticipantsBusy(true);
+        try {
+            await registerForCompetition(athleteToAdd.id, participantsComp.id);
+            notify.success(`${athleteToAdd.name} added.`);
+            setAthleteToAdd(null);
+            setParticipants(
+                await getRegistrationsByCompetition(participantsComp.id)
+            );
+        } catch (e) {
+            notify.error(
+                e,
+                "Could not add athlete. Check gender/age or duplicate registration."
+            );
+        } finally {
+            setParticipantsBusy(false);
+        }
+    }
+
+    async function handleRemoveParticipant(registrationId: number) {
+        if (!participantsComp) return;
+        setParticipantsBusy(true);
+        try {
+            await cancelRegistration(registrationId);
+            notify.success("Participant removed.");
+            setParticipants(
+                await getRegistrationsByCompetition(participantsComp.id)
+            );
+        } catch (e) {
+            notify.error(e, "Could not remove participant.");
+        } finally {
+            setParticipantsBusy(false);
+        }
+    }
 
     function openCreate() {
         setEditing(null);
@@ -145,8 +227,6 @@ function CreateCompetitionPage() {
 
     async function handleSave() {
         setSaving(true);
-        setError("");
-        setMessage("");
         try {
             if (form.sport === "slalom") {
                 const payload = {
@@ -177,30 +257,35 @@ function CreateCompetitionPage() {
                     await createBiathlonCompetition(payload);
                 }
             }
-            setMessage(editing ? "Competition updated." : "Competition created.");
+            notify.success(
+                editing ? "Competition updated." : "Competition created."
+            );
             setDialogOpen(false);
             load();
         } catch (e) {
-            console.error(e);
-            setError("Could not save competition. Check fields and try again.");
+            notify.error(e, "Could not save competition. Check fields and try again.");
         } finally {
             setSaving(false);
         }
     }
 
     async function handleDelete(c: Competition) {
-        if (!window.confirm(`Delete "${c.name}"?`)) return;
+        if (
+            !window.confirm(
+                `Delete "${c.name}"? This removes its registrations, results and medals.`
+            )
+        )
+            return;
         try {
             if (c.sport === "slalom") {
                 await deleteSlalomCompetition(c.id);
             } else {
                 await deleteBiathlonCompetition(c.id);
             }
-            setMessage("Competition deleted.");
+            notify.success("Competition deleted.");
             load();
         } catch (e) {
-            console.error(e);
-            setError("Could not delete competition.");
+            notify.error(e, "Could not delete competition.");
         }
     }
 
@@ -212,8 +297,6 @@ function CreateCompetitionPage() {
         )
             return;
         setFinalizingId(c.id);
-        setError("");
-        setMessage("");
         try {
             if (c.sport === "slalom") {
                 await finalizeSlalomCompetition(c.id);
@@ -222,15 +305,12 @@ function CreateCompetitionPage() {
                 await finalizeBiathlonCompetition(c.id);
                 await assignBiathlonMedals(c.id);
             }
-            setMessage(`"${c.name}" finalized and medals assigned.`);
+            notify.success(`"${c.name}" finalized and medals assigned.`);
             load();
         } catch (e) {
-            console.error(e);
-            setError(
-                extractErrorMessage(
-                    e,
-                    "Could not finalize competition. Make sure rankings are calculated first."
-                )
+            notify.error(
+                e,
+                "Could not finalize competition. Make sure rankings are calculated first."
             );
         } finally {
             setFinalizingId(null);
@@ -253,7 +333,6 @@ function CreateCompetitionPage() {
 
             <Stack spacing={2}>
                 {error && <Alert severity="error">{error}</Alert>}
-                {message && <Alert severity="success">{message}</Alert>}
 
                 <Stack
                     direction={{ xs: "column", md: "row" }}
@@ -328,6 +407,14 @@ function CreateCompetitionPage() {
                                                             onClick={() => openEdit(c)}
                                                         >
                                                             Edit
+                                                        </Button>
+                                                        <Button
+                                                            size="small"
+                                                            onClick={() =>
+                                                                openParticipants(c)
+                                                            }
+                                                        >
+                                                            Participants
                                                         </Button>
                                                         <Button
                                                             size="small"
@@ -504,6 +591,135 @@ function CreateCompetitionPage() {
                         disabled={saving || !form.name || !form.date}
                     >
                         {saving ? "Saving..." : "Save"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={Boolean(participantsComp)}
+                onClose={() => setParticipantsComp(null)}
+                fullWidth
+                maxWidth="sm"
+            >
+                <DialogTitle>
+                    Participants — {participantsComp?.name}
+                </DialogTitle>
+                <DialogContent>
+                    {participantsComp && (
+                        <Stack spacing={2} sx={{ mt: 1 }}>
+                            <Typography variant="body2" color="text.secondary">
+                                {participantsComp.sport === "slalom"
+                                    ? "Ski slalom"
+                                    : "Biathlon"}{" "}
+                                ·{" "}
+                                {participantsComp.gender === "MALE"
+                                    ? "Men"
+                                    : "Women"}{" "}
+                                · Min age {participantsComp.minimumAge}
+                            </Typography>
+
+                            {participantsComp.status === "FINISHED" ? (
+                                <Alert severity="info">
+                                    This competition is finalized; participants
+                                    are locked.
+                                </Alert>
+                            ) : (
+                                <Stack direction="row" spacing={1.5}>
+                                    <Autocomplete
+                                        sx={{ flex: 1 }}
+                                        options={eligibleAthletes}
+                                        value={athleteToAdd}
+                                        onChange={(_e, v) => setAthleteToAdd(v)}
+                                        getOptionLabel={(a) =>
+                                            `${a.name} — ${a.country.replace(
+                                                /_/g,
+                                                " "
+                                            )} (${a.gender === "MALE" ? "M" : "W"})`
+                                        }
+                                        isOptionEqualToValue={(a, b) =>
+                                            a.id === b.id
+                                        }
+                                        renderInput={(params) => (
+                                            <TextField
+                                                {...params}
+                                                label="Search athlete to add"
+                                                size="small"
+                                            />
+                                        )}
+                                    />
+                                    <Button
+                                        variant="contained"
+                                        disabled={
+                                            participantsBusy || !athleteToAdd
+                                        }
+                                        onClick={handleAddParticipant}
+                                    >
+                                        Add
+                                    </Button>
+                                </Stack>
+                            )}
+
+                            <Divider />
+
+                            {participants.length === 0 ? (
+                                <Typography color="text.secondary">
+                                    No athletes registered yet.
+                                </Typography>
+                            ) : (
+                                <TableContainer>
+                                    <Table size="small">
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell>Athlete</TableCell>
+                                                <TableCell>Country</TableCell>
+                                                <TableCell align="right">
+                                                    Remove
+                                                </TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {participants.map((p) => (
+                                                <TableRow key={p.registrationId}>
+                                                    <TableCell>
+                                                        {p.athleteName}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {(p.country ?? "").replace(
+                                                            /_/g,
+                                                            " "
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell align="right">
+                                                        <IconButton
+                                                            size="small"
+                                                            color="error"
+                                                            disabled={
+                                                                participantsBusy ||
+                                                                participantsComp.status ===
+                                                                    "FINISHED"
+                                                            }
+                                                            onClick={() =>
+                                                                handleRemoveParticipant(
+                                                                    p.registrationId
+                                                                )
+                                                            }
+                                                            aria-label="remove participant"
+                                                        >
+                                                            <DeleteIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            )}
+                        </Stack>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setParticipantsComp(null)}>
+                        Close
                     </Button>
                 </DialogActions>
             </Dialog>

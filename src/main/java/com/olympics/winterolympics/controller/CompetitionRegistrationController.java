@@ -1,10 +1,16 @@
 package com.olympics.winterolympics.controller;
 
 import com.olympics.winterolympics.dto.ApiResponse;
+import com.olympics.winterolympics.dto.AthleteDto;
 import com.olympics.winterolympics.dto.CompetitionRegistrationDto;
 import com.olympics.winterolympics.dto.RegistrationResponseDto;
+import com.olympics.winterolympics.service.AthleteService;
 import com.olympics.winterolympics.service.CompetitionRegistrationService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,10 +22,20 @@ import java.util.List;
 public class CompetitionRegistrationController {
 
     private final CompetitionRegistrationService registrationService;
+    private final AthleteService athleteService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<String>> registerAthlete(
-            @RequestBody CompetitionRegistrationDto dto) {
+            @Valid @RequestBody CompetitionRegistrationDto dto,
+            Authentication authentication) {
+
+        if (!isAdmin(authentication)) {
+            AthleteDto self = athleteService.getAthleteByUsername(authentication.getName());
+            if (!self.getId().equals(dto.getAthleteId())) {
+                throw new AccessDeniedException(
+                        "You can only register yourself for a competition.");
+            }
+        }
 
         registrationService.registerAthlete(dto);
 
@@ -51,11 +67,29 @@ public class CompetitionRegistrationController {
 
     @DeleteMapping("/{registrationId}")
     public ResponseEntity<ApiResponse<String>> cancel(
-            @PathVariable Long registrationId) {
+            @PathVariable Long registrationId,
+            Authentication authentication) {
+
+        if (!isAdmin(authentication)) {
+            RegistrationResponseDto registration =
+                    registrationService.getRegistration(registrationId);
+            AthleteDto self = athleteService.getAthleteByUsername(authentication.getName());
+            if (!self.getId().equals(registration.getAthleteId())) {
+                throw new AccessDeniedException(
+                        "You can only cancel your own registration.");
+            }
+        }
 
         registrationService.cancelRegistration(registrationId);
 
         return ResponseEntity.ok(new ApiResponse<>(
                 true, null, "Registration cancelled"));
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        return authentication != null
+                && authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch("ROLE_ADMIN"::equals);
     }
 }

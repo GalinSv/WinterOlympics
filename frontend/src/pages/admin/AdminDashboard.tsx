@@ -17,11 +17,12 @@ import {
 
 import { Link } from "react-router-dom";
 
-import { getAllCompetitions } from "../../services/competitionService";
 import {
-    generateBiathlonDemoResults,
-    generateSlalomDemoResults,
-} from "../../services/resultService";
+    getAllCompetitions,
+    runBiathlonDemo,
+    runSlalomDemo,
+} from "../../services/competitionService";
+import { notify } from "../../utils/notify";
 
 import type { Competition } from "../../types/api";
 
@@ -38,9 +39,6 @@ function AdminDashboard() {
 
     const [generating, setGenerating] =
         useState(false);
-
-    const [message, setMessage] =
-        useState("");
 
     const [error, setError] =
         useState("");
@@ -81,28 +79,31 @@ function AdminDashboard() {
             return;
         }
 
+        if (selectedCompetition.status === "FINISHED") {
+            notify.info("This competition is already finalized.");
+            return;
+        }
+
         setGenerating(true);
-        setMessage("");
-        setError("");
 
         try {
             if (selectedCompetition.sport === "slalom") {
-                await generateSlalomDemoResults(
-                    selectedCompetition.id
-                );
+                await runSlalomDemo(selectedCompetition.id);
             } else {
-                await generateBiathlonDemoResults(
-                    selectedCompetition.id
-                );
+                await runBiathlonDemo(selectedCompetition.id);
             }
 
-            setMessage(
-                `Demo results generated for ${selectedCompetition.name}.`
+            notify.success(
+                `Demo complete: "${selectedCompetition.name}" was filled with athletes, scored, ranked, finalized and medals were awarded.`
             );
+
+            // Reflect the new FINISHED status in the dropdown.
+            const refreshed = await getAllCompetitions();
+            setCompetitions(refreshed);
         } catch (requestError) {
-            console.error(requestError);
-            setError(
-                "Could not generate demo results. Make sure athletes are registered for this competition."
+            notify.error(
+                requestError,
+                "Could not generate demo. Make sure enough eligible athletes exist for this competition's gender and minimum age."
             );
         } finally {
             setGenerating(false);
@@ -159,12 +160,6 @@ function AdminDashboard() {
                     </CardContent>
                 </Card>
 
-                {message && (
-                    <Alert severity="success">
-                        {message}
-                    </Alert>
-                )}
-
                 {error && (
                     <Alert severity="error">
                         {error}
@@ -183,8 +178,10 @@ function AdminDashboard() {
                                 </Typography>
 
                                 <Typography color="text.secondary">
-                                    Generate realistic slalom or biathlon
-                                    results for registered athletes.
+                                    One click registers eligible athletes,
+                                    generates realistic results, calculates the
+                                    ranking, finalizes the competition and
+                                    awards medals.
                                 </Typography>
                             </Box>
 

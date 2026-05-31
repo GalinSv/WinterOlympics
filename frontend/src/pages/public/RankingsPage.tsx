@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import {
     Alert,
     Box,
+    Chip,
     CircularProgress,
     FormControl,
     InputLabel,
@@ -31,50 +32,46 @@ import type {
     SlalomResult,
 } from "../../types/api";
 
-type ResultRow =
-    | SlalomResult
-    | BiathlonResult;
+type ResultRow = SlalomResult | BiathlonResult;
 
-function formatTime(time?: number) {
-    return typeof time === "number"
-        ? time.toFixed(3)
-        : "-";
+function formatTime(time?: number | null) {
+    return typeof time === "number" ? time.toFixed(3) : "-";
 }
 
+// A competitor counts as ranked/finished only when they have a total time
+// (slalom: both runs completed; biathlon: finished the race). This is the
+// exact same condition the backend uses to assign finalRank, so Admin and
+// the public Rankings page agree.
+function isRanked(result: ResultRow) {
+    return result.totalTime !== null && result.totalTime !== undefined;
+}
+
+const NO_RANK = Number.POSITIVE_INFINITY;
+const NO_TIME = Number.POSITIVE_INFINITY;
+
+// Total ordering: ranked athletes first (by finalRank), then any completed
+// athletes not yet ranked (by total time), then DNF athletes last.
 function sortResults(results: ResultRow[]) {
-    return [...results].sort((first, second) => {
-        if (first.finalRank && second.finalRank) {
-            return first.finalRank - second.finalRank;
-        }
+    return [...results].sort((a, b) => {
+        const rankDiff = (a.finalRank ?? NO_RANK) - (b.finalRank ?? NO_RANK);
+        if (rankDiff !== 0) return rankDiff;
 
-        if (first.totalTime && second.totalTime) {
-            return first.totalTime - second.totalTime;
-        }
+        const timeDiff = (a.totalTime ?? NO_TIME) - (b.totalTime ?? NO_TIME);
+        if (timeDiff !== 0) return timeDiff;
 
-        return first.registrationId - second.registrationId;
+        return (a.athleteName ?? "").localeCompare(b.athleteName ?? "");
     });
 }
 
 function RankingsPage() {
     const [searchParams, setSearchParams] = useSearchParams();
 
-    const [competitions, setCompetitions] =
-        useState<Competition[]>([]);
-
-    const [selectedKey, setSelectedKey] =
-        useState("");
-
-    const [results, setResults] =
-        useState<ResultRow[]>([]);
-
-    const [loadingCompetitions, setLoadingCompetitions] =
-        useState(true);
-
-    const [loadingResults, setLoadingResults] =
-        useState(false);
-
-    const [error, setError] =
-        useState<string | null>(null);
+    const [competitions, setCompetitions] = useState<Competition[]>([]);
+    const [selectedKey, setSelectedKey] = useState("");
+    const [results, setResults] = useState<ResultRow[]>([]);
+    const [loadingCompetitions, setLoadingCompetitions] = useState(true);
+    const [loadingResults, setLoadingResults] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         getAllCompetitions()
@@ -96,23 +93,20 @@ function RankingsPage() {
                     setSelectedKey(`${target.sport}:${target.id}`);
                 }
             })
-            .catch(() =>
-                setError("Could not load competitions.")
-            )
+            .catch(() => setError("Could not load competitions."))
             .finally(() => setLoadingCompetitions(false));
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const selectedCompetition =
-        useMemo(() => {
-            const [sport, id] =
-                selectedKey.split(":");
+    const selectedCompetition = useMemo(() => {
+        const [sport, id] = selectedKey.split(":");
+        return competitions.find(
+            (competition) =>
+                competition.sport === sport && competition.id === Number(id)
+        );
+    }, [competitions, selectedKey]);
 
-            return competitions.find((competition) =>
-                competition.sport === sport &&
-                competition.id === Number(id)
-            );
-        }, [competitions, selectedKey]);
+    const isSlalom = selectedCompetition?.sport === "slalom";
 
     useEffect(() => {
         if (!selectedCompetition) {
@@ -129,12 +123,8 @@ function RankingsPage() {
                 : getBiathlonResults;
 
         loadResults(selectedCompetition.id)
-            .then((loadedResults) =>
-                setResults(sortResults(loadedResults))
-            )
-            .catch(() =>
-                setError("Could not load ranking results.")
-            )
+            .then((loadedResults) => setResults(sortResults(loadedResults)))
+            .catch(() => setError("Could not load ranking results."))
             .finally(() => setLoadingResults(false));
     }, [selectedCompetition]);
 
@@ -142,43 +132,42 @@ function RankingsPage() {
         return <CircularProgress />;
     }
 
+    const columnCount = isSlalom ? 7 : 7;
+
     return (
         <Box>
             <Typography
                 component="h1"
                 variant="h4"
-                sx={{ mb: 3, fontWeight: 700 }}
+                sx={{ mb: 1, fontWeight: 700 }}
             >
                 Rankings
             </Typography>
+            <Typography color="text.secondary" sx={{ mb: 3 }}>
+                Final standings are sorted by rank; athletes who did not finish
+                (DNF) appear last.
+            </Typography>
 
             <Stack spacing={2.5}>
-                {error && (
-                    <Alert severity="error">
-                        {error}
-                    </Alert>
-                )}
+                {error && <Alert severity="error">{error}</Alert>}
 
                 {competitions.length === 0 ? (
                     <Alert severity="info">
                         No competitions are available yet.
                     </Alert>
                 ) : (
-                    <FormControl
-                        sx={{ maxWidth: 420 }}
-                        fullWidth
-                    >
+                    <FormControl sx={{ maxWidth: 420 }} fullWidth>
                         <InputLabel id="competition-select-label">
                             Competition
                         </InputLabel>
-
                         <Select
                             labelId="competition-select-label"
                             label="Competition"
                             value={selectedKey}
                             onChange={(event) => {
                                 setSelectedKey(event.target.value);
-                                const [sport, id] = event.target.value.split(":");
+                                const [sport, id] =
+                                    event.target.value.split(":");
                                 setSearchParams({ sport, id });
                             }}
                         >
@@ -202,15 +191,34 @@ function RankingsPage() {
                     <CircularProgress />
                 ) : (
                     selectedCompetition && (
-                        <TableContainer>
+                        <TableContainer component={Box} sx={{ borderRadius: 2 }}>
                             <Table>
                                 <TableHead>
                                     <TableRow>
-                                        <TableCell>Rank</TableCell>
+                                        <TableCell width={70}>Rank</TableCell>
                                         <TableCell>Athlete</TableCell>
                                         <TableCell>Country</TableCell>
+                                        {isSlalom ? (
+                                            <>
+                                                <TableCell align="right">
+                                                    Run 1
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                    Run 2
+                                                </TableCell>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <TableCell align="right">
+                                                    Ski time
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                    Penalty
+                                                </TableCell>
+                                            </>
+                                        )}
                                         <TableCell align="right">
-                                            Total time
+                                            Total
                                         </TableCell>
                                         <TableCell>Status</TableCell>
                                     </TableRow>
@@ -218,36 +226,92 @@ function RankingsPage() {
                                 <TableBody>
                                     {results.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={5}>
-                                                No results have been entered
-                                                for this competition yet.
+                                            <TableCell colSpan={columnCount}>
+                                                No results have been entered for
+                                                this competition yet.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        results.map((result) => (
-                                            <TableRow key={result.id}>
-                                                <TableCell>
-                                                    {result.finalRank ?? "-"}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {result.athleteName ??
-                                                        `Registration ${result.registrationId}`}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {result.country ?? "-"}
-                                                </TableCell>
-                                                <TableCell align="right">
-                                                    {formatTime(
-                                                        result.totalTime
+                                        results.map((result) => {
+                                            const ranked = isRanked(result);
+                                            const slalom = result as SlalomResult;
+                                            const biathlon =
+                                                result as BiathlonResult;
+                                            return (
+                                                <TableRow
+                                                    key={result.id}
+                                                    hover
+                                                    sx={{
+                                                        opacity: ranked ? 1 : 0.6,
+                                                    }}
+                                                >
+                                                    <TableCell>
+                                                        {result.finalRank ?? "-"}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {result.athleteName ??
+                                                            `Registration ${result.registrationId}`}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {(
+                                                            result.country ?? "-"
+                                                        ).replace(/_/g, " ")}
+                                                    </TableCell>
+                                                    {isSlalom ? (
+                                                        <>
+                                                            <TableCell align="right">
+                                                                {formatTime(
+                                                                    slalom.firstRunTime
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell align="right">
+                                                                {formatTime(
+                                                                    slalom.secondRunTime
+                                                                )}
+                                                            </TableCell>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <TableCell align="right">
+                                                                {formatTime(
+                                                                    biathlon.skiingTime
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell align="right">
+                                                                {formatTime(
+                                                                    biathlon.penaltySeconds
+                                                                )}
+                                                            </TableCell>
+                                                        </>
                                                     )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {result.finished
-                                                        ? "Finished"
-                                                        : "DNF"}
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
+                                                    <TableCell align="right">
+                                                        {formatTime(
+                                                            result.totalTime
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Chip
+                                                            size="small"
+                                                            label={
+                                                                ranked
+                                                                    ? "Finished"
+                                                                    : "DNF"
+                                                            }
+                                                            color={
+                                                                ranked
+                                                                    ? "success"
+                                                                    : "default"
+                                                            }
+                                                            variant={
+                                                                ranked
+                                                                    ? "filled"
+                                                                    : "outlined"
+                                                            }
+                                                        />
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })
                                     )}
                                 </TableBody>
                             </Table>

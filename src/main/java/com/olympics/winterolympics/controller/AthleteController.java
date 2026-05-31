@@ -80,7 +80,21 @@ public class AthleteController {
     }
 
     @DeleteMapping("/{id}")
-    public void deleteAthlete(@PathVariable Long id) {
+    public void deleteAthlete(@PathVariable Long id,
+                             Authentication authentication) {
+
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .anyMatch("ROLE_ADMIN"::equals);
+
+        if (!isAdmin) {
+            AthleteDto self = athleteService.getAthleteByUsername(
+                    authentication.getName());
+            if (!self.getId().equals(id)) {
+                throw new AccessDeniedException("You can only delete your own profile");
+            }
+        }
+
         athleteService.deleteAthlete(id);
     }
 }

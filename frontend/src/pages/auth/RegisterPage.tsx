@@ -19,6 +19,7 @@ import {
 import { Link } from "react-router-dom";
 
 import { registerAthleteAccount } from "../../services/authService";
+import { notify } from "../../utils/notify";
 
 import type {
     Country,
@@ -106,11 +107,15 @@ function RegisterPage() {
             await registerAthleteAccount(request);
 
             setRequest(initialRequest);
-            setSuccessMessage(
-                "Account created successfully. You can now sign in."
-            );
+            const successText =
+                "Account created successfully. You can now sign in.";
+            setSuccessMessage(successText);
+            notify.success(successText);
         } catch (error) {
-            console.error(error);
+            notify.error(
+                error,
+                "Could not create account. Check the fields and try again."
+            );
 
             if (axios.isAxiosError(error)) {
                 const responseMessage =

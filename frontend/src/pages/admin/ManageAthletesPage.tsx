@@ -32,7 +32,7 @@ import {
     getAllAthletes,
     updateAthlete,
 } from "../../services/athleteService";
-import { extractErrorMessage } from "../../utils/errors";
+import { notify } from "../../utils/notify";
 
 import type { Athlete, Country, Gender } from "../../types/api";
 import { COUNTRIES } from "../../types/api";
@@ -50,7 +50,6 @@ function ManageAthletesPage() {
     const [athletes, setAthletes] = useState<Athlete[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [message, setMessage] = useState("");
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editing, setEditing] = useState<Athlete | null>(null);
     const [form, setForm] = useState<Athlete>(EMPTY_ATHLETE);
@@ -84,20 +83,18 @@ function ManageAthletesPage() {
 
     async function handleSave() {
         setSaving(true);
-        setError("");
-        setMessage("");
         try {
             if (editing?.id) {
                 await updateAthlete(editing.id, form);
-                setMessage("Athlete updated.");
+                notify.success("Athlete updated.");
             } else {
                 await createAthlete(form);
-                setMessage("Athlete created.");
+                notify.success("Athlete created.");
             }
             setDialogOpen(false);
             load();
         } catch (e) {
-            setError(extractErrorMessage(e, "Could not save athlete."));
+            notify.error(e, "Could not save athlete.");
         } finally {
             setSaving(false);
         }
@@ -108,11 +105,10 @@ function ManageAthletesPage() {
         if (!window.confirm(`Delete athlete "${athlete.name}"?`)) return;
         try {
             await deleteAthlete(athlete.id);
-            setMessage("Athlete deleted.");
+            notify.success("Athlete deleted.");
             load();
         } catch (e) {
-            console.error(e);
-            setError("Could not delete athlete.");
+            notify.error(e, "Could not delete athlete.");
         }
     }
 
@@ -132,7 +128,6 @@ function ManageAthletesPage() {
 
             <Stack spacing={2}>
                 {error && <Alert severity="error">{error}</Alert>}
-                {message && <Alert severity="success">{message}</Alert>}
 
                 <Card variant="outlined">
                     <CardContent>
