@@ -17,6 +17,7 @@ import {
     IconButton,
     InputLabel,
     MenuItem,
+    Pagination,
     Select,
     Stack,
     Table,
@@ -97,7 +98,14 @@ function CreateCompetitionPage() {
     const [sortOrder, setSortOrder] = useState<"DATE_DESC" | "DATE_ASC">(
         "DATE_DESC"
     );
+    const [genderFilter, setGenderFilter] = useState<"ALL" | Gender>("ALL");
+    const [statusFilter, setStatusFilter] = useState<
+        "ALL" | "ONGOING" | "FINALIZED"
+    >("ALL");
+    const [page, setPage] = useState(1);
     const [finalizingId, setFinalizingId] = useState<number | null>(null);
+
+    const PER_PAGE = 15;
 
     const [allAthletes, setAllAthletes] = useState<Athlete[]>([]);
     const [participantsComp, setParticipantsComp] =
@@ -110,12 +118,30 @@ function CreateCompetitionPage() {
         let list = competitions;
         const q = search.trim().toLowerCase();
         if (q) list = list.filter((c) => c.name.toLowerCase().includes(q));
+        if (genderFilter !== "ALL") {
+            list = list.filter((c) => c.gender === genderFilter);
+        }
+        if (statusFilter === "ONGOING") {
+            list = list.filter((c) => c.status !== "FINISHED");
+        } else if (statusFilter === "FINALIZED") {
+            list = list.filter((c) => c.status === "FINISHED");
+        }
         return [...list].sort((a, b) =>
             sortOrder === "DATE_DESC"
                 ? b.date.localeCompare(a.date)
                 : a.date.localeCompare(b.date)
         );
-    }, [competitions, search, sortOrder]);
+    }, [competitions, search, sortOrder, genderFilter, statusFilter]);
+
+    const pageCount = Math.max(1, Math.ceil(visibleCompetitions.length / PER_PAGE));
+    const pagedCompetitions = visibleCompetitions.slice(
+        (page - 1) * PER_PAGE,
+        page * PER_PAGE
+    );
+
+    useEffect(() => {
+        setPage(1);
+    }, [search, genderFilter, statusFilter, sortOrder]);
 
     function load() {
         setLoading(true);
@@ -317,6 +343,87 @@ function CreateCompetitionPage() {
         }
     }
 
+    function renderCompetitionTable(list: Competition[]) {
+        return (
+            <TableContainer>
+                <Table size="small">
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>Name</TableCell>
+                            <TableCell>Sport</TableCell>
+                            <TableCell>Date</TableCell>
+                            <TableCell>Gender</TableCell>
+                            <TableCell align="right">Min age</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell align="right">Actions</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {list.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={7}>
+                                    No competitions here.
+                                </TableCell>
+                            </TableRow>
+                        ) : (
+                            list.map((c) => (
+                                <TableRow key={`${c.sport}-${c.id}`}>
+                                    <TableCell>{c.name}</TableCell>
+                                    <TableCell>
+                                        {c.sport === "slalom"
+                                            ? "Slalom"
+                                            : "Biathlon"}
+                                    </TableCell>
+                                    <TableCell>{c.date}</TableCell>
+                                    <TableCell>
+                                        {c.gender === "MALE" ? "Men" : "Women"}
+                                    </TableCell>
+                                    <TableCell align="right">
+                                        {c.minimumAge}
+                                    </TableCell>
+                                    <TableCell>{c.status ?? "—"}</TableCell>
+                                    <TableCell align="right">
+                                        <Button
+                                            size="small"
+                                            onClick={() => openEdit(c)}
+                                        >
+                                            Edit
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            onClick={() => openParticipants(c)}
+                                        >
+                                            Participants
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            disabled={
+                                                finalizingId === c.id ||
+                                                c.status === "FINISHED"
+                                            }
+                                            onClick={() => handleFinalize(c)}
+                                        >
+                                            {finalizingId === c.id
+                                                ? "Finalizing..."
+                                                : "Finalize"}
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            color="error"
+                                            onClick={() => handleDelete(c)}
+                                        >
+                                            Delete
+                                        </Button>
+                                    </TableCell>
+                                </TableRow>
+                            ))
+                        )}
+                    </TableBody>
+                </Table>
+            </TableContainer>
+        );
+    }
+
     return (
         <Box>
             <Stack
@@ -357,96 +464,67 @@ function CreateCompetitionPage() {
                         <ToggleButton value="DATE_DESC">Newest first</ToggleButton>
                         <ToggleButton value="DATE_ASC">Oldest first</ToggleButton>
                     </ToggleButtonGroup>
+                    <ToggleButtonGroup
+                        value={genderFilter}
+                        exclusive
+                        onChange={(
+                            _e: unknown,
+                            value: "ALL" | Gender | null
+                        ) => {
+                            if (value) setGenderFilter(value);
+                        }}
+                        size="small"
+                    >
+                        <ToggleButton value="ALL">All</ToggleButton>
+                        <ToggleButton value="MALE">Men</ToggleButton>
+                        <ToggleButton value="FEMALE">Women</ToggleButton>
+                    </ToggleButtonGroup>
+                    <ToggleButtonGroup
+                        value={statusFilter}
+                        exclusive
+                        onChange={(
+                            _e: unknown,
+                            value: "ALL" | "ONGOING" | "FINALIZED" | null
+                        ) => {
+                            if (value) setStatusFilter(value);
+                        }}
+                        size="small"
+                    >
+                        <ToggleButton value="ALL">All</ToggleButton>
+                        <ToggleButton value="ONGOING">Ongoing</ToggleButton>
+                        <ToggleButton value="FINALIZED">Finalized</ToggleButton>
+                    </ToggleButtonGroup>
                 </Stack>
 
-                <Card variant="outlined">
-                    <CardContent>
-                        {loading ? (
-                            <CircularProgress />
-                        ) : (
-                            <TableContainer>
-                                <Table size="small">
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell>Name</TableCell>
-                                            <TableCell>Sport</TableCell>
-                                            <TableCell>Date</TableCell>
-                                            <TableCell>Gender</TableCell>
-                                            <TableCell align="right">Min age</TableCell>
-                                            <TableCell>Status</TableCell>
-                                            <TableCell align="right">Actions</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {visibleCompetitions.length === 0 ? (
-                                            <TableRow>
-                                                <TableCell colSpan={7}>
-                                                    No competitions match.
-                                                </TableCell>
-                                            </TableRow>
-                                        ) : (
-                                            visibleCompetitions.map((c) => (
-                                                <TableRow key={`${c.sport}-${c.id}`}>
-                                                    <TableCell>{c.name}</TableCell>
-                                                    <TableCell>
-                                                        {c.sport === "slalom"
-                                                            ? "Slalom"
-                                                            : "Biathlon"}
-                                                    </TableCell>
-                                                    <TableCell>{c.date}</TableCell>
-                                                    <TableCell>{c.gender}</TableCell>
-                                                    <TableCell align="right">
-                                                        {c.minimumAge}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {c.status ?? "—"}
-                                                    </TableCell>
-                                                    <TableCell align="right">
-                                                        <Button
-                                                            size="small"
-                                                            onClick={() => openEdit(c)}
-                                                        >
-                                                            Edit
-                                                        </Button>
-                                                        <Button
-                                                            size="small"
-                                                            onClick={() =>
-                                                                openParticipants(c)
-                                                            }
-                                                        >
-                                                            Participants
-                                                        </Button>
-                                                        <Button
-                                                            size="small"
-                                                            disabled={
-                                                                finalizingId === c.id ||
-                                                                c.status === "FINISHED"
-                                                            }
-                                                            onClick={() =>
-                                                                handleFinalize(c)
-                                                            }
-                                                        >
-                                                            {finalizingId === c.id
-                                                                ? "Finalizing..."
-                                                                : "Finalize"}
-                                                        </Button>
-                                                        <Button
-                                                            size="small"
-                                                            color="error"
-                                                            onClick={() => handleDelete(c)}
-                                                        >
-                                                            Delete
-                                                        </Button>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))
-                                        )}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                        )}
-                    </CardContent>
-                </Card>
+                {loading ? (
+                    <CircularProgress />
+                ) : (
+                    <Card variant="outlined">
+                        <CardContent>
+                            <Typography
+                                color="text.secondary"
+                                sx={{ mb: 1.5 }}
+                            >
+                                {visibleCompetitions.length} competition
+                                {visibleCompetitions.length === 1 ? "" : "s"}
+                            </Typography>
+                            {renderCompetitionTable(pagedCompetitions)}
+                            {pageCount > 1 && (
+                                <Stack
+                                    direction="row"
+                                    sx={{ mt: 2, justifyContent: "center" }}
+                                >
+                                    <Pagination
+                                        count={pageCount}
+                                        page={page}
+                                        onChange={(_e, value) => setPage(value)}
+                                        color="primary"
+                                    />
+                                </Stack>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
             </Stack>
 
             <Dialog
@@ -460,6 +538,12 @@ function CreateCompetitionPage() {
                 </DialogTitle>
                 <DialogContent>
                     <Stack spacing={2} sx={{ mt: 1 }}>
+                        {editing && editing.status !== "DRAFT" && (
+                            <Alert severity="info">
+                                This competition already has results and can no
+                                longer be edited.
+                            </Alert>
+                        )}
                         <FormControl fullWidth disabled={Boolean(editing)}>
                             <InputLabel id="sport-label">Sport</InputLabel>
                             <Select
@@ -501,7 +585,7 @@ function CreateCompetitionPage() {
                             }}
                             fullWidth
                         />
-                        <FormControl fullWidth>
+                        <FormControl fullWidth disabled={Boolean(editing)}>
                             <InputLabel id="gender-label">Gender</InputLabel>
                             <Select
                                 labelId="gender-label"
@@ -528,6 +612,7 @@ function CreateCompetitionPage() {
                                     minimumAge: Number(e.target.value),
                                 })
                             }
+                            disabled={Boolean(editing)}
                             fullWidth
                         />
 
@@ -593,7 +678,12 @@ function CreateCompetitionPage() {
                     <Button
                         variant="contained"
                         onClick={handleSave}
-                        disabled={saving || !form.name || !form.date}
+                        disabled={
+                            saving ||
+                            !form.name ||
+                            !form.date ||
+                            (Boolean(editing) && editing?.status !== "DRAFT")
+                        }
                     >
                         {saving ? "Saving..." : "Save"}
                     </Button>
@@ -623,10 +713,10 @@ function CreateCompetitionPage() {
                                 · Min age {participantsComp.minimumAge}
                             </Typography>
 
-                            {participantsComp.status === "FINISHED" ? (
+                            {participantsComp.status !== "DRAFT" ? (
                                 <Alert severity="info">
-                                    This competition is finalized; participants
-                                    are locked.
+                                    Results have started; participants are
+                                    locked.
                                 </Alert>
                             ) : (
                                 <Stack direction="row" spacing={1.5}>
@@ -700,8 +790,8 @@ function CreateCompetitionPage() {
                                                             color="error"
                                                             disabled={
                                                                 participantsBusy ||
-                                                                participantsComp.status ===
-                                                                    "FINISHED"
+                                                                participantsComp.status !==
+                                                                    "DRAFT"
                                                             }
                                                             onClick={() =>
                                                                 handleRemoveParticipant(

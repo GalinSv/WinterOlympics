@@ -67,8 +67,11 @@ public class CompetitionServiceImpl implements CompetitionService {
     public SlalomCompetitionDto updateSlalomCompetition(Long id, SlalomCompetitionDto dto) {
         SlalomCompetition competition = (SlalomCompetition) competitionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Slalom competition not found"));
-        assertNotFinished(competition);
-        mapSlalomDtoToEntity(dto, competition);
+        assertEditable(competition);
+        // Gender and minimum age are fixed once the competition is created.
+        competition.setName(dto.getName());
+        competition.setDate(dto.getDate());
+        competition.setSecondRunQualifiedCount(dto.getSecondRunQualifiedCount());
         competitionRepository.save(competition);
         return mapSlalomEntityToDto(competition);
     }
@@ -107,8 +110,13 @@ public class CompetitionServiceImpl implements CompetitionService {
     public BiathlonCompetitionDto updateBiathlonCompetition(Long id, BiathlonCompetitionDto dto) {
         BiathlonCompetition competition = (BiathlonCompetition) competitionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Biathlon competition not found"));
-        assertNotFinished(competition);
-        mapBiathlonDtoToEntity(dto, competition);
+        assertEditable(competition);
+        // Gender and minimum age are fixed once the competition is created.
+        competition.setName(dto.getName());
+        competition.setDate(dto.getDate());
+        competition.setLapCount(dto.getLapCount());
+        competition.setShootingRounds(dto.getShootingRounds());
+        competition.setPenaltySeconds(dto.getPenaltySeconds());
         competitionRepository.save(competition);
         return mapBiathlonEntityToDto(competition);
     }
@@ -167,10 +175,10 @@ public class CompetitionServiceImpl implements CompetitionService {
         competitionRepository.save(c);
     }
 
-    private void assertNotFinished(Competition competition) {
-        if (competition.getStatus() == CompetitionStatus.FINISHED) {
+    private void assertEditable(Competition competition) {
+        if (competition.getStatus() != CompetitionStatus.DRAFT) {
             throw new CompetitionLockedException(
-                    "Competition is finalized and cannot be modified");
+                    "Competition can no longer be edited once results have started.");
         }
     }
 

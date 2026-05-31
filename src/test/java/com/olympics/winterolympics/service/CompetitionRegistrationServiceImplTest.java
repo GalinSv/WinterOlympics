@@ -103,7 +103,7 @@ class CompetitionRegistrationServiceImplTest {
         c.setId(2L);
         c.setGender(gender);
         c.setMinimumAge(minimumAge);
-        c.setStatus(CompetitionStatus.ACTIVE);
+        c.setStatus(CompetitionStatus.DRAFT);
         c.setSecondRunQualifiedCount(30);
         return c;
     }

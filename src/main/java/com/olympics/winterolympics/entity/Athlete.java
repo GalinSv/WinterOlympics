@@ -3,6 +3,9 @@ package com.olympics.winterolympics.entity;
 import com.olympics.winterolympics.enums.Country;
 import com.olympics.winterolympics.enums.Gender;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Past;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -18,8 +21,10 @@ public class Athlete {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @NotBlank
     private String name;
 
+    @Email
     private String email;
 
     private String phoneNumber;
@@ -30,9 +35,9 @@ public class Athlete {
     @Enumerated(EnumType.STRING)
     private Gender gender;
 
+    @Past
     private LocalDate birthDate;
 
-    /** Keycloak username (preferred_username) that owns this athlete profile. */
     @Column(unique = true)
     private String username;
 

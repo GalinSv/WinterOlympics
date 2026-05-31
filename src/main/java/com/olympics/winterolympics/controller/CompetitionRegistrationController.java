@@ -43,6 +43,21 @@ public class CompetitionRegistrationController {
                 true, null, "Registration created successfully"));
     }
 
+    @PostMapping("/fill/{competitionId}")
+    public ResponseEntity<ApiResponse<String>> fillRandom(
+            @PathVariable Long competitionId,
+            @RequestParam(defaultValue = "16") int count,
+            Authentication authentication) {
+
+        if (!isAdmin(authentication)) {
+            throw new AccessDeniedException("Only administrators can auto-fill participants.");
+        }
+
+        int added = registrationService.fillRandomEligible(competitionId, count);
+        return ResponseEntity.ok(new ApiResponse<>(
+                true, null, added + " random athletes added."));
+    }
+
     @GetMapping("/competition/{competitionId}")
     public ResponseEntity<ApiResponse<List<RegistrationResponseDto>>>
     getByCompetition(@PathVariable Long competitionId) {

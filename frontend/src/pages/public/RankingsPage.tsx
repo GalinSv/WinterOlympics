@@ -260,27 +260,35 @@ function RankingsPage() {
                                                     {isSlalom ? (
                                                         <>
                                                             <TableCell align="right">
-                                                                {formatTime(
-                                                                    slalom.firstRunTime
-                                                                )}
+                                                                {ranked
+                                                                    ? formatTime(
+                                                                          slalom.firstRunTime
+                                                                      )
+                                                                    : "-"}
                                                             </TableCell>
                                                             <TableCell align="right">
-                                                                {formatTime(
-                                                                    slalom.secondRunTime
-                                                                )}
+                                                                {ranked
+                                                                    ? formatTime(
+                                                                          slalom.secondRunTime
+                                                                      )
+                                                                    : "-"}
                                                             </TableCell>
                                                         </>
                                                     ) : (
                                                         <>
                                                             <TableCell align="right">
-                                                                {formatTime(
-                                                                    biathlon.skiingTime
-                                                                )}
+                                                                {ranked
+                                                                    ? formatTime(
+                                                                          biathlon.skiingTime
+                                                                      )
+                                                                    : "-"}
                                                             </TableCell>
                                                             <TableCell align="right">
-                                                                {formatTime(
-                                                                    biathlon.penaltySeconds
-                                                                )}
+                                                                {ranked
+                                                                    ? formatTime(
+                                                                          biathlon.penaltySeconds
+                                                                      )
+                                                                    : "-"}
                                                             </TableCell>
                                                         </>
                                                     )}

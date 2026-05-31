@@ -21,6 +21,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -40,9 +42,9 @@ public class CompetitionRegistrationServiceImpl implements CompetitionRegistrati
         Competition competition = competitionRepository.findById(dto.getCompetitionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Competition not found"));
 
-        if (competition.getStatus() == CompetitionStatus.FINISHED) {
+        if (competition.getStatus() != CompetitionStatus.DRAFT) {
             throw new CompetitionLockedException(
-                    "Competition is finalized; registrations are closed.");
+                    "Registrations are closed once results have started.");
         }
 
         if (registrationRepository.existsByAthleteIdAndCompetitionId(
@@ -72,6 +74,40 @@ public class CompetitionRegistrationServiceImpl implements CompetitionRegistrati
     }
 
     @Override
+    public int fillRandomEligible(Long competitionId, int count) {
+        Competition competition = competitionRepository.findById(competitionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Competition not found"));
+
+        if (competition.getStatus() != CompetitionStatus.DRAFT) {
+            throw new CompetitionLockedException(
+                    "Registrations are closed once results have started.");
+        }
+
+        LocalDate today = LocalDate.now();
+        List<Athlete> eligible = new ArrayList<>(
+                athleteRepository.findByGender(competition.getGender()).stream()
+                        .filter(a -> a.getBirthDate() != null
+                                && Period.between(a.getBirthDate(), today).getYears()
+                                        >= competition.getMinimumAge())
+                        .filter(a -> !registrationRepository
+                                .existsByAthleteIdAndCompetitionId(a.getId(), competition.getId()))
+                        .toList());
+        Collections.shuffle(eligible);
+
+        int added = 0;
+        for (Athlete athlete : eligible.stream().limit(Math.max(count, 0)).toList()) {
+            CompetitionRegistration registration = new CompetitionRegistration();
+            registration.setAthlete(athlete);
+            registration.setCompetition(competition);
+            registration.setRegistrationDate(LocalDateTime.now());
+            registration.setStatus(RegistrationStatus.REGISTERED);
+            registrationRepository.save(registration);
+            added++;
+        }
+        return added;
+    }
+
+    @Override
     public List<RegistrationResponseDto> getRegistrationsByCompetition(Long competitionId) {
         return registrationRepository.findByCompetitionId(competitionId).stream()
                 .map(this::toDto).toList();
@@ -96,9 +132,9 @@ public class CompetitionRegistrationServiceImpl implements CompetitionRegistrati
         CompetitionRegistration registration = registrationRepository.findById(registrationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Registration not found"));
         if (registration.getCompetition() != null
-                && registration.getCompetition().getStatus() == CompetitionStatus.FINISHED) {
+                && registration.getCompetition().getStatus() != CompetitionStatus.DRAFT) {
             throw new CompetitionLockedException(
-                    "Competition is finalized; registrations cannot be cancelled.");
+                    "Registrations are locked once results have started.");
         }
         registrationRepository.delete(registration);
     }

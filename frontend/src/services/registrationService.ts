@@ -26,3 +26,9 @@ export async function getRegistrationsByAthlete(athleteId: number) {
 export async function cancelRegistration(registrationId: number) {
     await axiosInstance.delete(`/registrations/${registrationId}`);
 }
+
+export async function fillRandomAthletes(competitionId: number, count = 16) {
+    await axiosInstance.post(`/registrations/fill/${competitionId}`, null, {
+        params: { count },
+    });
+}

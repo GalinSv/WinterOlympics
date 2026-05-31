@@ -26,7 +26,10 @@ import {
 } from "@mui/material";
 
 import { getAllCompetitions } from "../../services/competitionService";
-import { getRegistrationsByCompetition } from "../../services/registrationService";
+import {
+    getRegistrationsByCompetition,
+    fillRandomAthletes,
+} from "../../services/registrationService";
 import {
     calculateBiathlonRanking,
     calculateSlalomQualifications,
@@ -40,11 +43,16 @@ import {
 import { notify } from "../../utils/notify";
 
 import type {
+    BiathlonCompetition,
     BiathlonResult,
     Competition,
     Registration,
     SlalomResult,
 } from "../../types/api";
+
+function randomTime(min: number, max: number) {
+    return Math.round((min + Math.random() * (max - min)) * 1000) / 1000;
+}
 
 type RowState = {
     firstRunTime: string;
@@ -211,6 +219,129 @@ function EnterResultsPage() {
         }
     }
 
+    async function handleSaveAll() {
+        if (!selected || locked) return;
+        setBusy(true);
+        let saved = 0;
+        try {
+            for (const reg of registrations) {
+                const row = rows[reg.registrationId];
+                if (!row) continue;
+                if (selected.sport === "slalom") {
+                    const slalom = existingSlalom(reg.registrationId);
+                    if (row.firstRunTime) {
+                        await saveSlalomFirstRun(
+                            reg.registrationId,
+                            Number(row.firstRunTime),
+                            row.finished
+                        );
+                        saved++;
+                    }
+                    if (slalom?.qualifiedForSecondRun && row.secondRunTime) {
+                        await saveSlalomSecondRun(
+                            reg.registrationId,
+                            Number(row.secondRunTime),
+                            row.finished
+                        );
+                        saved++;
+                    }
+                } else if (row.skiingTime) {
+                    await saveBiathlonResult(
+                        reg.registrationId,
+                        Number(row.skiingTime),
+                        Number(row.missedShots || "0"),
+                        row.finished
+                    );
+                    saved++;
+                }
+            }
+            notify.success(`Saved ${saved} result${saved === 1 ? "" : "s"}.`);
+            await loadDetails();
+        } catch (e) {
+            notify.error(e, "Could not save all results.");
+            await loadDetails();
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    async function handleFillAthletes() {
+        if (!selected || selected.status !== "DRAFT") return;
+        setBusy(true);
+        try {
+            await fillRandomAthletes(selected.id, 16);
+            notify.success("Random eligible athletes added.");
+            await loadDetails();
+        } catch (e) {
+            notify.error(
+                e,
+                "Could not add random athletes. Make sure eligible athletes exist for this gender and minimum age."
+            );
+        } finally {
+            setBusy(false);
+        }
+    }
+
+    async function handleRandomTimes() {
+        if (!selected || locked) return;
+        setBusy(true);
+        try {
+            if (selected.sport === "slalom") {
+                const secondRunPhase = slalomResults.some(
+                    (r) => r.qualifiedForSecondRun
+                );
+                for (const reg of registrations) {
+                    const slalom = existingSlalom(reg.registrationId);
+                    const finished = Math.random() < 0.92;
+                    if (secondRunPhase) {
+                        if (
+                            slalom?.qualifiedForSecondRun &&
+                            slalom?.secondRunTime == null
+                        ) {
+                            await saveSlalomSecondRun(
+                                reg.registrationId,
+                                randomTime(45, 90),
+                                finished
+                            );
+                        }
+                    } else {
+                        await saveSlalomFirstRun(
+                            reg.registrationId,
+                            randomTime(45, 90),
+                            finished
+                        );
+                    }
+                }
+                notify.success(
+                    secondRunPhase
+                        ? "Random Run 2 times generated."
+                        : "Random Run 1 times generated."
+                );
+            } else {
+                const biathlon = selected as BiathlonCompetition;
+                const laps = biathlon.lapCount ?? 5;
+                const maxMisses = (biathlon.shootingRounds ?? 2) * 5;
+                for (const reg of registrations) {
+                    const finished = Math.random() < 0.92;
+                    const misses = Math.floor(Math.random() * (maxMisses + 1));
+                    await saveBiathlonResult(
+                        reg.registrationId,
+                        randomTime(laps * 210, laps * 330),
+                        misses,
+                        finished
+                    );
+                }
+                notify.success("Random biathlon results generated.");
+            }
+            await loadDetails();
+        } catch (e) {
+            notify.error(e, "Could not generate random times.");
+            await loadDetails();
+        } finally {
+            setBusy(false);
+        }
+    }
+
     async function handleAction(
         action: () => Promise<unknown>,
         successMessage: string
@@ -323,6 +454,29 @@ function EnterResultsPage() {
                                 spacing={1.5}
                                 sx={{ mt: 2, flexWrap: "wrap" }}
                             >
+                                <Button
+                                    variant="outlined"
+                                    color="secondary"
+                                    disabled={busy || selected.status !== "DRAFT"}
+                                    onClick={handleFillAthletes}
+                                >
+                                    Fill random athletes
+                                </Button>
+                                <Button
+                                    variant="outlined"
+                                    color="secondary"
+                                    disabled={busy || locked || registrations.length === 0}
+                                    onClick={handleRandomTimes}
+                                >
+                                    Generate random times
+                                </Button>
+                                <Button
+                                    variant="contained"
+                                    disabled={busy || locked}
+                                    onClick={handleSaveAll}
+                                >
+                                    Save all results
+                                </Button>
                                 {selected.sport === "slalom" && (
                                     <>
                                         <Button

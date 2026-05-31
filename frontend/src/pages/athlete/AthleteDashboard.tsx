@@ -222,7 +222,10 @@ function AthleteDashboard() {
                                 }
                                 fullWidth
                             />
-                            <FormControl fullWidth>
+                            <FormControl
+                                fullWidth
+                                disabled={Boolean(athlete?.country)}
+                            >
                                 <InputLabel id="me-country">Country</InputLabel>
                                 <Select
                                     labelId="me-country"
@@ -242,7 +245,10 @@ function AthleteDashboard() {
                                     ))}
                                 </Select>
                             </FormControl>
-                            <FormControl fullWidth>
+                            <FormControl
+                                fullWidth
+                                disabled={Boolean(athlete?.gender)}
+                            >
                                 <InputLabel id="me-gender">Gender</InputLabel>
                                 <Select
                                     labelId="me-gender"
@@ -269,6 +275,7 @@ function AthleteDashboard() {
                                         birthDate: e.target.value,
                                     })
                                 }
+                                disabled={Boolean(athlete?.birthDate)}
                                 slotProps={{
                                     inputLabel: { shrink: true },
                                     htmlInput: {

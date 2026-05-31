@@ -10,6 +10,7 @@ import {
     CardContent,
     Chip,
     CircularProgress,
+    Pagination,
     Stack,
     TextField,
     ToggleButton,
@@ -70,6 +71,10 @@ function SportCompetitionsPage<TCompetition extends Competition>({
 
     const [search, setSearch] = useState("");
     const [sortOrder, setSortOrder] = useState<SortOrder>("DATE_DESC");
+    const [statusFilter, setStatusFilter] = useState<
+        "ALL" | "ONGOING" | "FINALIZED"
+    >("ALL");
+    const [page, setPage] = useState(1);
     const [athleteId, setAthleteId] = useState<number | null>(null);
     const [registrations, setRegistrations] = useState<
         Record<number, { registrationId: number; status: string }>
@@ -127,6 +132,11 @@ function SportCompetitionsPage<TCompetition extends Competition>({
         if (genderFilter !== "ALL") {
             list = list.filter((c) => c.gender === genderFilter);
         }
+        if (statusFilter === "ONGOING") {
+            list = list.filter((c) => c.status !== "FINISHED");
+        } else if (statusFilter === "FINALIZED") {
+            list = list.filter((c) => c.status === "FINISHED");
+        }
         const q = search.trim().toLowerCase();
         if (q) {
             list = list.filter((c) => c.name.toLowerCase().includes(q));
@@ -137,7 +147,21 @@ function SportCompetitionsPage<TCompetition extends Competition>({
                 : a.date.localeCompare(b.date)
         );
         return sorted;
-    }, [competitions, genderFilter, search, sortOrder]);
+    }, [competitions, genderFilter, statusFilter, search, sortOrder]);
+
+    const PER_PAGE = 15;
+    const pageCount = Math.max(
+        1,
+        Math.ceil(filteredCompetitions.length / PER_PAGE)
+    );
+    const pagedCompetitions = filteredCompetitions.slice(
+        (page - 1) * PER_PAGE,
+        page * PER_PAGE
+    );
+
+    useEffect(() => {
+        setPage(1);
+    }, [genderFilter, statusFilter, search, sortOrder]);
 
     async function handleRegister(competition: TCompetition) {
         if (!athleteId) return;
@@ -235,6 +259,23 @@ function SportCompetitionsPage<TCompetition extends Competition>({
                         <ToggleButton value="DATE_DESC">Newest first</ToggleButton>
                         <ToggleButton value="DATE_ASC">Oldest first</ToggleButton>
                     </ToggleButtonGroup>
+
+                    <ToggleButtonGroup
+                        value={statusFilter}
+                        exclusive
+                        onChange={(
+                            _e: unknown,
+                            value: "ALL" | "ONGOING" | "FINALIZED" | null
+                        ) => {
+                            if (value) setStatusFilter(value);
+                        }}
+                        size="small"
+                        aria-label="status filter"
+                    >
+                        <ToggleButton value="ALL">All</ToggleButton>
+                        <ToggleButton value="ONGOING">Ongoing</ToggleButton>
+                        <ToggleButton value="FINALIZED">Finalized</ToggleButton>
+                    </ToggleButtonGroup>
                 </Stack>
             </Stack>
 
@@ -261,7 +302,7 @@ function SportCompetitionsPage<TCompetition extends Competition>({
                     gap: 2,
                 }}
             >
-                {filteredCompetitions.map((competition) => (
+                {pagedCompetitions.map((competition) => (
                     <Card
                         key={`${competition.sport}-${competition.id}`}
                         variant="outlined"
@@ -376,6 +417,17 @@ function SportCompetitionsPage<TCompetition extends Competition>({
                     </Card>
                 ))}
             </Box>
+
+            {pageCount > 1 && (
+                <Stack direction="row" sx={{ mt: 3, justifyContent: "center" }}>
+                    <Pagination
+                        count={pageCount}
+                        page={page}
+                        onChange={(_e, value) => setPage(value)}
+                        color="primary"
+                    />
+                </Stack>
+            )}
         </Box>
     );
 }

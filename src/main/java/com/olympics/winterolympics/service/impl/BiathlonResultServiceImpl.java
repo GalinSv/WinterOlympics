@@ -3,12 +3,14 @@ package com.olympics.winterolympics.service.impl;
 import com.olympics.winterolympics.dto.BiathlonResultDto;
 import com.olympics.winterolympics.entity.BiathlonCompetition;
 import com.olympics.winterolympics.entity.BiathlonResult;
+import com.olympics.winterolympics.entity.Competition;
 import com.olympics.winterolympics.entity.CompetitionRegistration;
 import com.olympics.winterolympics.enums.CompetitionStatus;
 import com.olympics.winterolympics.exception.CompetitionLockedException;
 import com.olympics.winterolympics.exception.ResourceNotFoundException;
 import com.olympics.winterolympics.repository.BiathlonResultRepository;
 import com.olympics.winterolympics.repository.CompetitionRegistrationRepository;
+import com.olympics.winterolympics.repository.CompetitionRepository;
 import com.olympics.winterolympics.service.BiathlonResultService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,8 @@ public class BiathlonResultServiceImpl
     private final CompetitionRegistrationRepository
             registrationRepository;
 
+    private final CompetitionRepository competitionRepository;
+
     @Override
     public BiathlonResultDto saveResult(
             Long registrationId,
@@ -44,6 +48,8 @@ public class BiathlonResultServiceImpl
         if (registration.getCompetition().getStatus() == CompetitionStatus.FINISHED) {
             throw new CompetitionLockedException("Competition is finalized; results cannot be modified.");
         }
+
+        activate(registration.getCompetition());
 
         BiathlonCompetition competition =
                 (BiathlonCompetition)
@@ -281,5 +287,12 @@ public class BiathlonResultServiceImpl
         return value == null
                 ? null
                 : roundToMilliseconds(value);
+    }
+
+    private void activate(Competition competition) {
+        if (competition.getStatus() == CompetitionStatus.DRAFT) {
+            competition.setStatus(CompetitionStatus.ACTIVE);
+            competitionRepository.save(competition);
+        }
     }
 }

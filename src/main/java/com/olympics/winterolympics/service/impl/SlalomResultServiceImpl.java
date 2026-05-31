@@ -1,6 +1,7 @@
 package com.olympics.winterolympics.service.impl;
 
 import com.olympics.winterolympics.dto.SlalomResultDto;
+import com.olympics.winterolympics.entity.Competition;
 import com.olympics.winterolympics.entity.CompetitionRegistration;
 import com.olympics.winterolympics.entity.SlalomCompetition;
 import com.olympics.winterolympics.entity.SlalomResult;
@@ -8,6 +9,7 @@ import com.olympics.winterolympics.enums.CompetitionStatus;
 import com.olympics.winterolympics.exception.CompetitionLockedException;
 import com.olympics.winterolympics.exception.ResourceNotFoundException;
 import com.olympics.winterolympics.repository.CompetitionRegistrationRepository;
+import com.olympics.winterolympics.repository.CompetitionRepository;
 import com.olympics.winterolympics.repository.SlalomResultRepository;
 import com.olympics.winterolympics.service.SlalomResultService;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,8 @@ public class SlalomResultServiceImpl
     private final CompetitionRegistrationRepository
             registrationRepository;
 
+    private final CompetitionRepository competitionRepository;
+
     @Override
     public SlalomResultDto saveFirstRunTime(
             Long registrationId,
@@ -43,6 +47,8 @@ public class SlalomResultServiceImpl
         if (registration.getCompetition().getStatus() == CompetitionStatus.FINISHED) {
             throw new CompetitionLockedException("Competition is finalized; results cannot be modified.");
         }
+
+        activate(registration.getCompetition());
 
         SlalomResult result =
                 slalomResultRepository
@@ -139,6 +145,8 @@ public class SlalomResultServiceImpl
         if (result.getRegistration().getCompetition().getStatus() == CompetitionStatus.FINISHED) {
             throw new CompetitionLockedException("Competition is finalized; results cannot be modified.");
         }
+
+        activate(result.getRegistration().getCompetition());
 
         result.setSecondRunTime(roundOrNull(secondRunTime));
         result.setFinished(finished);
@@ -383,6 +391,13 @@ public class SlalomResultServiceImpl
         return value == null
                 ? null
                 : roundToMilliseconds(value);
+    }
+
+    private void activate(Competition competition) {
+        if (competition.getStatus() == CompetitionStatus.DRAFT) {
+            competition.setStatus(CompetitionStatus.ACTIVE);
+            competitionRepository.save(competition);
+        }
     }
 
     private void recomputeTotalTime(SlalomResult result) {

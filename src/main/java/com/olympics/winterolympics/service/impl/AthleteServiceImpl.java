@@ -93,7 +93,23 @@ public class AthleteServiceImpl implements AthleteService {
         Athlete athlete = athleteRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Athlete not found"));
 
-        applyDto(athlete, athleteDto);
+        // Always editable.
+        athlete.setName(athleteDto.getName());
+        athlete.setEmail(athleteDto.getEmail());
+        athlete.setPhoneNumber(athleteDto.getPhoneNumber());
+
+        // Gender, country and birth date are locked once chosen, so an athlete
+        // cannot switch gender to enter another competition and then switch back.
+        if (athlete.getGender() == null) {
+            athlete.setGender(athleteDto.getGender());
+        }
+        if (athlete.getCountry() == null) {
+            athlete.setCountry(athleteDto.getCountry());
+        }
+        if (athlete.getBirthDate() == null) {
+            athlete.setBirthDate(athleteDto.getBirthDate());
+        }
+
         return mapToDto(athleteRepository.save(athlete));
     }
 
