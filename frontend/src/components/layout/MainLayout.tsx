@@ -27,7 +27,6 @@ function MainLayout() {
 
     function handleLogout() {
         logout();
-        window.location.href = "/";
     }
 
     return (

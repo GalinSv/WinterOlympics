@@ -12,7 +12,7 @@ public interface AthleteRepository extends JpaRepository<Athlete, Long> {
 
     boolean existsByEmail(String email);
 
-    Optional<Athlete> findByUserUsername(String username);
+    Optional<Athlete> findByUsername(String username);
 
     List<Athlete> findByNameContainingIgnoreCase(String name);
 

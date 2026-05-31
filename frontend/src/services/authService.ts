@@ -1,73 +1,18 @@
-import axios from "axios";
+import keycloak from "../keycloak";
 
-import { API_BASE_URL } from "../config/api";
+// Authentication is delegated to Keycloak (OAuth2 / OpenID Connect).
+// After login/registration, return to the app root (not /login) so the
+// auth pages don't re-trigger another redirect.
+const HOME = window.location.origin + "/";
 
-import type { TokenResponse } from "../types/auth";
-import type {
-    ApiResponse,
-    RegisterRequest,
-    RegisterResponse,
-} from "../types/api";
-
-const ACCESS_TOKEN_KEY =
-    "access_token";
-
-function storeToken(data: TokenResponse) {
-
-    const token =
-        data.access_token || data.accessToken;
-
-    if (token) {
-        localStorage.setItem(
-            ACCESS_TOKEN_KEY,
-            token
-        );
-    }
+export function login() {
+    return keycloak.login({ redirectUri: HOME });
 }
 
-export async function login(
-    username: string,
-    password: string
-) {
-
-    const response =
-        await axios.post<
-            ApiResponse<TokenResponse>
-        >(
-            `${API_BASE_URL}/auth/login`,
-            {
-                username,
-                password,
-            }
-        );
-
-    const data =
-        response.data.data;
-
-    storeToken(data);
-
-    return data;
-}
-
-export async function refreshAccessToken() {
-    throw new Error("Refresh tokens are not used");
+export function register() {
+    return keycloak.register({ redirectUri: HOME });
 }
 
 export function logout() {
-    localStorage.removeItem(ACCESS_TOKEN_KEY);
-}
-
-export async function registerAthleteAccount(
-    request: RegisterRequest
-) {
-
-    const response =
-        await axios.post<
-            ApiResponse<RegisterResponse>
-        >(
-            `${API_BASE_URL}/auth/register`,
-            request
-        );
-
-    return response.data.data;
+    return keycloak.logout({ redirectUri: window.location.origin });
 }

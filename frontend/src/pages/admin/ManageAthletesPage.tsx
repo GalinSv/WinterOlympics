@@ -263,7 +263,12 @@ function ManageAthletesPage() {
                             onChange={(e) =>
                                 setForm({ ...form, birthDate: e.target.value })
                             }
-                            slotProps={{ inputLabel: { shrink: true } }}
+                            slotProps={{
+                                inputLabel: { shrink: true },
+                                htmlInput: {
+                                    max: new Date().toISOString().slice(0, 10),
+                                },
+                            }}
                             fullWidth
                         />
                     </Stack>

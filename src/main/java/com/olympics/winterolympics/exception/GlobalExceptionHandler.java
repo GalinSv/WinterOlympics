@@ -23,11 +23,6 @@ public class GlobalExceptionHandler {
         return error(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
-    @ExceptionHandler(DuplicateUserException.class)
-    public ResponseEntity<Map<String, String>> handleDuplicateUser(DuplicateUserException ex) {
-        return error(HttpStatus.CONFLICT, ex.getMessage());
-    }
-
     @ExceptionHandler(DuplicateRegistrationException.class)
     public ResponseEntity<Map<String, String>> handleDuplicateRegistration(DuplicateRegistrationException ex) {
         return error(HttpStatus.CONFLICT, ex.getMessage());

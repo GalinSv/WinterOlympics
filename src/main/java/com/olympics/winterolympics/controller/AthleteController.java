@@ -8,7 +8,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -42,16 +42,30 @@ public class AthleteController {
     }
 
     @GetMapping("/me")
-    public AthleteDto getCurrentAthlete(
-            @AuthenticationPrincipal UserDetails userDetails) {
-        return athleteService.getAthleteByUsername(userDetails.getUsername());
+    public AthleteDto getCurrentAthlete(@AuthenticationPrincipal Jwt jwt) {
+        return athleteService.getOrCreateCurrentAthlete(
+                jwt.getClaimAsString("preferred_username"),
+                fullName(jwt),
+                jwt.getClaimAsString("email"));
     }
 
     @PutMapping("/me")
     public AthleteDto updateMyProfile(
-            @AuthenticationPrincipal UserDetails userDetails,
+            @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody AthleteDto athleteDto) {
-        return athleteService.updateOwnProfile(userDetails.getUsername(), athleteDto);
+        return athleteService.updateOwnProfile(
+                jwt.getClaimAsString("preferred_username"), athleteDto);
+    }
+
+    private String fullName(Jwt jwt) {
+        String given = jwt.getClaimAsString("given_name");
+        String family = jwt.getClaimAsString("family_name");
+        if (given != null || family != null) {
+            return ((given == null ? "" : given) + " "
+                    + (family == null ? "" : family)).trim();
+        }
+        String name = jwt.getClaimAsString("name");
+        return name != null ? name : jwt.getClaimAsString("preferred_username");
     }
 
     @GetMapping("/{id}")

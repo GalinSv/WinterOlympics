@@ -2,6 +2,7 @@ package com.olympics.winterolympics.dto;
 
 import com.olympics.winterolympics.enums.CompetitionStatus;
 import com.olympics.winterolympics.enums.Gender;
+import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
@@ -19,6 +20,7 @@ public class CompetitionDto {
     private String name;
 
     @NotNull
+    @FutureOrPresent(message = "Competition date cannot be in the past")
     private LocalDate date;
 
     @NotNull

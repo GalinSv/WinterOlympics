@@ -32,9 +32,9 @@ public class Athlete {
 
     private LocalDate birthDate;
 
-    @OneToOne
-    @JoinColumn(name = "user_id")
-    private User user;
+    /** Keycloak username (preferred_username) that owns this athlete profile. */
+    @Column(unique = true)
+    private String username;
 
     @OneToMany(mappedBy = "athlete")
     private List<CompetitionRegistration> registrations;

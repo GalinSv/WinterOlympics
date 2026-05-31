@@ -58,8 +58,22 @@ public class AthleteServiceImpl implements AthleteService {
     @Override
     public AthleteDto getAthleteByUsername(String username) {
 
-        Athlete athlete = athleteRepository.findByUserUsername(username)
+        Athlete athlete = athleteRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Athlete not found"));
+        return mapToDto(athlete);
+    }
+
+    @Override
+    public AthleteDto getOrCreateCurrentAthlete(String username, String name, String email) {
+
+        Athlete athlete = athleteRepository.findByUsername(username)
+                .orElseGet(() -> {
+                    Athlete created = new Athlete();
+                    created.setUsername(username);
+                    created.setName((name != null && !name.isBlank()) ? name : username);
+                    created.setEmail(email);
+                    return athleteRepository.save(created);
+                });
         return mapToDto(athlete);
     }
 
@@ -76,7 +90,7 @@ public class AthleteServiceImpl implements AthleteService {
     @Override
     public AthleteDto updateOwnProfile(String username, AthleteDto athleteDto) {
 
-        Athlete athlete = athleteRepository.findByUserUsername(username)
+        Athlete athlete = athleteRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Athlete not found"));
 
         applyDto(athlete, athleteDto);

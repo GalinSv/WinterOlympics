@@ -1,54 +1,33 @@
 import axios from "axios";
-import type { InternalAxiosRequestConfig } from "axios";
 
 import { API_BASE_URL } from "../config/api";
-import {
-    logout,
-} from "../services/authService";
-import { getAccessToken } from "../utils/jwt";
+import keycloak from "../keycloak";
 
 const axiosInstance = axios.create({
     baseURL: API_BASE_URL,
 });
 
-axiosInstance.interceptors.request.use(
-    (config) => {
-        const token =
-            getAccessToken();
-
-        if (token) {
-            config.headers.Authorization =
-                `Bearer ${token}`;
+axiosInstance.interceptors.request.use(async (config) => {
+    if (keycloak.authenticated) {
+        try {
+            // Refresh the access token if it expires within 30 seconds.
+            await keycloak.updateToken(30);
+        } catch {
+            keycloak.login();
         }
-
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
+        if (keycloak.token) {
+            config.headers.Authorization = `Bearer ${keycloak.token}`;
+        }
     }
-);
+    return config;
+});
 
 axiosInstance.interceptors.response.use(
     (response) => response,
-    async (error) => {
-
-        const originalRequest =
-            error.config as
-                | (InternalAxiosRequestConfig & {
-                    _retry?: boolean;
-                })
-                | undefined;
-
-        if (
-            error.response?.status === 401 &&
-            originalRequest &&
-            !originalRequest._retry
-        ) {
-            originalRequest._retry = true;
-            logout();
-            window.location.href = "/login";
+    (error) => {
+        if (error.response?.status === 401) {
+            keycloak.login();
         }
-
         return Promise.reject(error);
     }
 );
