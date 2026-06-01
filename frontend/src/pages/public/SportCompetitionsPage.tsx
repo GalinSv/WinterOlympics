@@ -311,15 +311,29 @@ function SportCompetitionsPage<TCompetition extends Competition>({
                                 `/rankings?sport=${competition.sport}&id=${competition.id}`
                             )
                         }
-                        sx={{ cursor: "pointer", "&:hover": { boxShadow: 3 } }}
+                        sx={{
+                            cursor: "pointer",
+                            display: "flex",
+                            flexDirection: "column",
+                            height: "100%",
+                            "&:hover": {
+                                boxShadow: 4,
+                                transform: "translateY(-3px)",
+                                borderColor: "primary.light",
+                            },
+                        }}
                     >
-                        <CardContent>
+                        <CardContent sx={{ flexGrow: 1, width: "100%" }}>
                             <Stack spacing={1.25}>
                                 <Stack
                                     direction="row"
                                     spacing={1}
                                     useFlexGap
-                                    sx={{ flexWrap: "wrap" }}
+                                    sx={{
+                                        flexWrap: "wrap",
+                                        minHeight: 56,
+                                        alignContent: "flex-start",
+                                    }}
                                 >
                                     <Chip
                                         label={getGenderLabel(

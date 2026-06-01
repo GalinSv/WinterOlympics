@@ -9,6 +9,7 @@ import {
     FormControl,
     InputLabel,
     MenuItem,
+    Paper,
     Select,
     Stack,
     Table,
@@ -191,7 +192,16 @@ function RankingsPage() {
                     <CircularProgress />
                 ) : (
                     selectedCompetition && (
-                        <TableContainer component={Box} sx={{ borderRadius: 2 }}>
+                        <TableContainer
+                            component={Paper}
+                            variant="outlined"
+                            sx={{
+                                overflow: "hidden",
+                                "& tbody tr:nth-of-type(odd)": {
+                                    backgroundColor: "#f8fafc",
+                                },
+                            }}
+                        >
                             <Table>
                                 <TableHead>
                                     <TableRow>

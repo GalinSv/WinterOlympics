@@ -22,11 +22,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Controller (web-layer) test. Loads ONLY the controller + security config;
- * the service and the JWT decoder are mocked, so there is no real database.
- * It verifies request mapping and the Keycloak role rules (200 / 401 / 403).
- */
 @WebMvcTest
 @ContextConfiguration(classes = {SlalomCompetitionController.class, SecurityConfig.class})
 @ActiveProfiles("test")

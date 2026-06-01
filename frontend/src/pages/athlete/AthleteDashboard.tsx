@@ -26,51 +26,25 @@ import {
     getCurrentAthlete,
     updateMyProfile,
 } from "../../services/athleteService";
-import { getAllCompetitions } from "../../services/competitionService";
-import { registerForCompetition } from "../../services/registrationService";
 import { notify } from "../../utils/notify";
 
-import type { Athlete, Competition, Country, Gender } from "../../types/api";
+import type { Athlete, Country, Gender } from "../../types/api";
 import { COUNTRIES } from "../../types/api";
 
 function AthleteDashboard() {
     const [athlete, setAthlete] = useState<Athlete | null>(null);
-    const [competitions, setCompetitions] = useState<Competition[]>([]);
-    const [selectedKey, setSelectedKey] = useState("");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [busy, setBusy] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [editForm, setEditForm] = useState<Athlete | null>(null);
     const [savingEdit, setSavingEdit] = useState(false);
 
     useEffect(() => {
-        Promise.all([getCurrentAthlete(), getAllCompetitions()])
-            .then(([me, all]) => {
-                setAthlete(me);
-                setCompetitions(all);
-                if (all[0]) setSelectedKey(`${all[0].sport}:${all[0].id}`);
-            })
+        getCurrentAthlete()
+            .then(setAthlete)
             .catch(() => setError("Could not load athlete profile."))
             .finally(() => setLoading(false));
     }, []);
-
-    async function handleRegister() {
-        if (!athlete?.id || !selectedKey) return;
-        const [, id] = selectedKey.split(":");
-        setBusy(true);
-        try {
-            await registerForCompetition(athlete.id, Number(id));
-            notify.success("You are registered.");
-        } catch (e) {
-            notify.error(
-                e,
-                "Could not register. Check gender and minimum-age requirements."
-            );
-        } finally {
-            setBusy(false);
-        }
-    }
 
     function openEdit() {
         if (!athlete) return;
@@ -135,51 +109,20 @@ function AthleteDashboard() {
 
                 <Card variant="outlined">
                     <CardContent>
-                        <Typography variant="h6" sx={{ mb: 2 }}>
-                            Register for a competition
+                        <Typography variant="h6" sx={{ mb: 1 }}>
+                            My registrations
                         </Typography>
-                        <Stack
-                            direction={{ xs: "column", md: "row" }}
-                            spacing={2}
-                            sx={{ alignItems: { md: "center" } }}
+                        <Typography color="text.secondary" sx={{ mb: 2 }}>
+                            Register for competitions from the Slalom or Biathlon
+                            pages.
+                        </Typography>
+                        <Button
+                            component={Link}
+                            to="/athlete/registrations"
+                            variant="contained"
                         >
-                            <FormControl sx={{ minWidth: 320 }}>
-                                <InputLabel id="comp-label">
-                                    Competition
-                                </InputLabel>
-                                <Select
-                                    labelId="comp-label"
-                                    label="Competition"
-                                    value={selectedKey}
-                                    onChange={(e) =>
-                                        setSelectedKey(e.target.value)
-                                    }
-                                >
-                                    {competitions.map((c) => (
-                                        <MenuItem
-                                            key={`${c.sport}-${c.id}`}
-                                            value={`${c.sport}:${c.id}`}
-                                        >
-                                            {c.name} ({c.sport}) — {c.gender},
-                                            min age {c.minimumAge}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            <Button
-                                variant="contained"
-                                disabled={busy || !selectedKey}
-                                onClick={handleRegister}
-                            >
-                                Register
-                            </Button>
-                            <Button
-                                component={Link}
-                                to="/athlete/registrations"
-                            >
-                                My registrations
-                            </Button>
-                        </Stack>
+                            View my registrations
+                        </Button>
                     </CardContent>
                 </Card>
             </Stack>

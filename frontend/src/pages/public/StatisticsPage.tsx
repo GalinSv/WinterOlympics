@@ -3,13 +3,19 @@ import { useEffect, useMemo, useState } from "react";
 import {
     Alert,
     Box,
+    Button,
     Card,
     CardContent,
-    CircularProgress,
     Chip,
+    CircularProgress,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
     FormControl,
     InputLabel,
     MenuItem,
+    Paper,
     Select,
     Stack,
     Table,
@@ -241,7 +247,16 @@ function StatisticsPage() {
                         </Card>
                     </Box>
 
-                    <TableContainer>
+                    <TableContainer
+                        component={Paper}
+                        variant="outlined"
+                        sx={{
+                            overflow: "hidden",
+                            "& tbody tr:nth-of-type(odd)": {
+                                backgroundColor: "#f8fafc",
+                            },
+                        }}
+                    >
                         <Table>
                             <TableHead>
                                 <TableRow>
@@ -266,13 +281,8 @@ function StatisticsPage() {
                                             hover
                                             sx={{ cursor: "pointer" }}
                                             onClick={() =>
-                                                setSelectedCountry(
-                                                    selectedCountry === row.country
-                                                        ? null
-                                                        : row.country
-                                                )
+                                                setSelectedCountry(row.country)
                                             }
-                                            selected={selectedCountry === row.country}
                                         >
                                             <TableCell>
                                                 {row.country.replace(/_/g, " ")}
@@ -288,58 +298,70 @@ function StatisticsPage() {
                         </Table>
                     </TableContainer>
 
-                    {selectedCountry && (
-                        <Card variant="outlined">
-                            <CardContent>
-                                <Typography variant="h6" sx={{ mb: 2 }}>
-                                    Medalists for {selectedCountry.replace(/_/g, " ")}
-                                </Typography>
-                                {selectedCountryMedals.length === 0 ? (
-                                    <Alert severity="info">
-                                        No medals recorded for this country.
-                                    </Alert>
-                                ) : (
-                                    <TableContainer>
-                                        <Table size="small">
-                                            <TableHead>
-                                                <TableRow>
-                                                    <TableCell>Athlete</TableCell>
-                                                    <TableCell>Competition</TableCell>
-                                                    <TableCell>Medal</TableCell>
-                                                </TableRow>
-                                            </TableHead>
-                                            <TableBody>
-                                                {selectedCountryMedals.map((m, i) => (
-                                                    <TableRow key={i}>
-                                                        <TableCell>{m.athleteName}</TableCell>
-                                                        <TableCell>{m.competitionName}</TableCell>
-                                                        <TableCell>
-                                                            <Chip
-                                                                size="small"
-                                                                label={m.medal}
-                                                                sx={{
-                                                                    bgcolor:
-                                                                        m.medal === "GOLD"
-                                                                            ? "#FFD700"
-                                                                            : m.medal === "SILVER"
-                                                                              ? "#C0C0C0"
-                                                                              : "#CD7F32",
-                                                                    color: "#000",
-                                                                    fontWeight: 600,
-                                                                }}
-                                                            />
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))}
-                                            </TableBody>
-                                        </Table>
-                                    </TableContainer>
-                                )}
-                            </CardContent>
-                        </Card>
-                    )}
                 </Stack>
             )}
+
+            <Dialog
+                open={Boolean(selectedCountry)}
+                onClose={() => setSelectedCountry(null)}
+                fullWidth
+                maxWidth="sm"
+            >
+                <DialogTitle>
+                    Medalists for {selectedCountry?.replace(/_/g, " ")}
+                </DialogTitle>
+                <DialogContent>
+                    {selectedCountryMedals.length === 0 ? (
+                        <Alert severity="info" sx={{ mt: 1 }}>
+                            No medals recorded for this country.
+                        </Alert>
+                    ) : (
+                        <TableContainer>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow>
+                                        <TableCell>Athlete</TableCell>
+                                        <TableCell>Competition</TableCell>
+                                        <TableCell>Medal</TableCell>
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {selectedCountryMedals.map((m, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell>{m.athleteName}</TableCell>
+                                            <TableCell>
+                                                {m.competitionName}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Chip
+                                                    size="small"
+                                                    label={m.medal}
+                                                    sx={{
+                                                        bgcolor:
+                                                            m.medal === "GOLD"
+                                                                ? "#FFD700"
+                                                                : m.medal ===
+                                                                    "SILVER"
+                                                                  ? "#C0C0C0"
+                                                                  : "#CD7F32",
+                                                        color: "#000",
+                                                        fontWeight: 600,
+                                                    }}
+                                                />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setSelectedCountry(null)}>
+                        Close
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 }
