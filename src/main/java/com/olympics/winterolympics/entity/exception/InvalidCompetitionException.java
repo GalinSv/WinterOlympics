@@ -1,4 +1,4 @@
-package com.olympics.winterolympics.exception;
+package com.olympics.winterolympics.entity.exception;
 
 public class InvalidCompetitionException extends RuntimeException {
 

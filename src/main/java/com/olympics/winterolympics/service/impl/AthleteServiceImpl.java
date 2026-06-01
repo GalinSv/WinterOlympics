@@ -2,7 +2,7 @@ package com.olympics.winterolympics.service.impl;
 
 import com.olympics.winterolympics.dto.AthleteDto;
 import com.olympics.winterolympics.entity.Athlete;
-import com.olympics.winterolympics.exception.ResourceNotFoundException;
+import com.olympics.winterolympics.entity.exception.ResourceNotFoundException;
 import com.olympics.winterolympics.repository.AthleteRepository;
 import com.olympics.winterolympics.service.AthleteService;
 import lombok.RequiredArgsConstructor;

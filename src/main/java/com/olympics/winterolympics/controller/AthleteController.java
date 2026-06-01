@@ -1,7 +1,6 @@
 package com.olympics.winterolympics.controller;
 
 import com.olympics.winterolympics.dto.AthleteDto;
-import com.olympics.winterolympics.exception.InvalidCompetitionException;
 import com.olympics.winterolympics.service.AthleteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;

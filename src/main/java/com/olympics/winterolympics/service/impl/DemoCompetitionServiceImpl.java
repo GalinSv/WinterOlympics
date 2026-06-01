@@ -6,7 +6,7 @@ import com.olympics.winterolympics.entity.BiathlonCompetition;
 import com.olympics.winterolympics.entity.CompetitionRegistration;
 import com.olympics.winterolympics.entity.SlalomCompetition;
 import com.olympics.winterolympics.enums.RegistrationStatus;
-import com.olympics.winterolympics.exception.ResourceNotFoundException;
+import com.olympics.winterolympics.entity.exception.ResourceNotFoundException;
 import com.olympics.winterolympics.repository.AthleteRepository;
 import com.olympics.winterolympics.repository.CompetitionRegistrationRepository;
 import com.olympics.winterolympics.repository.CompetitionRepository;

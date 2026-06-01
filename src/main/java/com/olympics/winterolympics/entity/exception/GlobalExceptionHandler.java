@@ -1,4 +1,4 @@
-package com.olympics.winterolympics.exception;
+package com.olympics.winterolympics.entity.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
