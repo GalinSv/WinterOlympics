@@ -1,6 +1,5 @@
 import { createTheme } from "@mui/material/styles";
 
-// "Winter" theme: cool blues, soft surfaces, rounded cards, gentle motion.
 const theme = createTheme({
     palette: {
         mode: "light",

@@ -39,10 +39,6 @@ function formatTime(time?: number | null) {
     return typeof time === "number" ? time.toFixed(3) : "-";
 }
 
-// A competitor counts as ranked/finished only when they have a total time
-// (slalom: both runs completed; biathlon: finished the race). This is the
-// exact same condition the backend uses to assign finalRank, so Admin and
-// the public Rankings page agree.
 function isRanked(result: ResultRow) {
     return result.totalTime !== null && result.totalTime !== undefined;
 }
@@ -50,8 +46,6 @@ function isRanked(result: ResultRow) {
 const NO_RANK = Number.POSITIVE_INFINITY;
 const NO_TIME = Number.POSITIVE_INFINITY;
 
-// Total ordering: ranked athletes first (by finalRank), then any completed
-// athletes not yet ranked (by total time), then DNF athletes last.
 function sortResults(results: ResultRow[]) {
     return [...results].sort((a, b) => {
         const rankDiff = (a.finalRank ?? NO_RANK) - (b.finalRank ?? NO_RANK);

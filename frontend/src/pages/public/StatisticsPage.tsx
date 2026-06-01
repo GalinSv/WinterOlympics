@@ -110,7 +110,7 @@ function StatisticsPage() {
                                 }
                             });
                         } catch {
-                            /* ignore competitions without results */
+                            return;
                         }
                     })
                 );

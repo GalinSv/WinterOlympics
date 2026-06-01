@@ -17,11 +17,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * Full integration test: real controller -> real service -> real (H2) database,
- * driven through HTTP with MockMvc. This is the "from the request all the way to
- * the database" test. Each test runs in a transaction that is rolled back.
- */
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional

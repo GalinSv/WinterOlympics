@@ -26,7 +26,6 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Public, aggregated data (no login required).
                         .requestMatchers(HttpMethod.GET,
                                 "/api/statistics/**",
                                 "/api/slalom-results/**",
@@ -35,7 +34,6 @@ public class SecurityConfig {
                                 "/api/biathlon-competitions/**"
                         ).permitAll()
 
-                        // Admin-only writes.
                         .requestMatchers(HttpMethod.POST,
                                 "/api/statistics/**",
                                 "/api/slalom-results/**",
@@ -47,7 +45,6 @@ public class SecurityConfig {
                                 "/api/biathlon-competitions/**"
                         ).hasRole("ADMIN")
 
-                        // Athlete self-service + admin.
                         .requestMatchers(
                                 "/api/registrations/**",
                                 "/api/athletes/**"
@@ -65,7 +62,6 @@ public class SecurityConfig {
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
         JwtAuthenticationConverter converter = new JwtAuthenticationConverter();
         converter.setJwtGrantedAuthoritiesConverter(new KeycloakRoleConverter());
-        // Make authentication.getName() return the Keycloak username.
         converter.setPrincipalClaimName("preferred_username");
         return converter;
     }

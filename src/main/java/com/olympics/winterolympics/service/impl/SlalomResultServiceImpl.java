@@ -83,7 +83,6 @@ public class SlalomResultServiceImpl
                                 .getRegistration()
                                 .getCompetition();
 
-        // Recalculate from scratch so the operation is repeatable.
         results.forEach(result -> {
             result.setQualifiedForSecondRun(false);
             result.setSecondRunStartOrder(null);
@@ -109,7 +108,6 @@ public class SlalomResultServiceImpl
                         .limit(qualifiedCount)
                         .toList();
 
-        // Second-run start order: the slowest qualifier from run one starts first.
         List<SlalomResult> startOrder =
                 qualified.stream()
                         .sorted(Comparator.comparing(

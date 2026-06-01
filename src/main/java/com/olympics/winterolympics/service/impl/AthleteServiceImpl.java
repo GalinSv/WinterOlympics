@@ -6,6 +6,7 @@ import com.olympics.winterolympics.exception.ResourceNotFoundException;
 import com.olympics.winterolympics.repository.AthleteRepository;
 import com.olympics.winterolympics.service.AthleteService;
 import lombok.RequiredArgsConstructor;
+import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -15,6 +16,8 @@ import java.util.List;
 public class AthleteServiceImpl implements AthleteService {
 
     private final AthleteRepository athleteRepository;
+
+    private final ModelMapper modelMapper;
 
     @Override
     public AthleteDto createAthlete(AthleteDto athleteDto) {
@@ -93,13 +96,10 @@ public class AthleteServiceImpl implements AthleteService {
         Athlete athlete = athleteRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("Athlete not found"));
 
-        // Always editable.
         athlete.setName(athleteDto.getName());
         athlete.setEmail(athleteDto.getEmail());
         athlete.setPhoneNumber(athleteDto.getPhoneNumber());
 
-        // Gender, country and birth date are locked once chosen, so an athlete
-        // cannot switch gender to enter another competition and then switch back.
         if (athlete.getGender() == null) {
             athlete.setGender(athleteDto.getGender());
         }
@@ -129,28 +129,10 @@ public class AthleteServiceImpl implements AthleteService {
     }
 
     private AthleteDto mapToDto(Athlete athlete) {
-
-        AthleteDto athleteDto = new AthleteDto();
-        athleteDto.setId(athlete.getId());
-        athleteDto.setName(athlete.getName());
-        athleteDto.setEmail(athlete.getEmail());
-        athleteDto.setPhoneNumber(athlete.getPhoneNumber());
-        athleteDto.setCountry(athlete.getCountry());
-        athleteDto.setGender(athlete.getGender());
-        athleteDto.setBirthDate(athlete.getBirthDate());
-        return athleteDto;
+        return modelMapper.map(athlete, AthleteDto.class);
     }
 
     private Athlete mapToEntity(AthleteDto athleteDto) {
-
-        Athlete athlete = new Athlete();
-        athlete.setId(athleteDto.getId());
-        athlete.setName(athleteDto.getName());
-        athlete.setEmail(athleteDto.getEmail());
-        athlete.setPhoneNumber(athleteDto.getPhoneNumber());
-        athlete.setCountry(athleteDto.getCountry());
-        athlete.setGender(athleteDto.getGender());
-        athlete.setBirthDate(athleteDto.getBirthDate());
-        return athlete;
+        return modelMapper.map(athleteDto, Athlete.class);
     }
 }

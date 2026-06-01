@@ -9,7 +9,6 @@ public interface CompetitionRegistrationService {
 
     void registerAthlete(CompetitionRegistrationDto dto);
 
-    /** Registers up to {@code count} random eligible athletes (demo helper). */
     int fillRandomEligible(Long competitionId, int count);
 
     List<RegistrationResponseDto> getRegistrationsByCompetition(Long competitionId);

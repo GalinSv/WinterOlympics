@@ -63,7 +63,6 @@ class SlalomResultServiceImplTest {
         verify(slalomResultRepository).save(captor.capture());
         SlalomResult saved = captor.getValue();
 
-        // Upsert: the same row is updated, never duplicated.
         assertThat(saved.getId()).isEqualTo(99L);
         assertThat(saved.getFirstRunTime()).isEqualTo(50.123);
         assertThat(dto.getFirstRunTime()).isEqualTo(50.123);
@@ -92,13 +91,11 @@ class SlalomResultServiceImplTest {
 
         List<SlalomResultDto> qualified = service.calculateQualifiedAthletes(1L);
 
-        // Top 2 by first-run time qualify (50.0 and 55.0); 60.0 and the DNF do not.
         assertThat(fast.getQualifiedForSecondRun()).isTrue();
         assertThat(middle.getQualifiedForSecondRun()).isTrue();
         assertThat(slowExtra.getQualifiedForSecondRun()).isFalse();
         assertThat(dnf.getQualifiedForSecondRun()).isFalse();
 
-        // Slowest qualifier (55.0) starts first in run two.
         assertThat(middle.getSecondRunStartOrder()).isEqualTo(1);
         assertThat(fast.getSecondRunStartOrder()).isEqualTo(2);
 

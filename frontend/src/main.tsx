@@ -11,8 +11,6 @@ import App from "./App";
 import theme from "./theme";
 import keycloak from "./keycloak";
 
-// Silently check whether the user already has a Keycloak session, then render.
-// Public pages work without a login; protected actions trigger keycloak.login().
 keycloak
     .init({
         onLoad: "check-sso",

@@ -68,7 +68,6 @@ public class CompetitionServiceImpl implements CompetitionService {
         SlalomCompetition competition = (SlalomCompetition) competitionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Slalom competition not found"));
         assertEditable(competition);
-        // Gender and minimum age are fixed once the competition is created.
         competition.setName(dto.getName());
         competition.setDate(dto.getDate());
         competition.setSecondRunQualifiedCount(dto.getSecondRunQualifiedCount());
@@ -111,7 +110,6 @@ public class CompetitionServiceImpl implements CompetitionService {
         BiathlonCompetition competition = (BiathlonCompetition) competitionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Biathlon competition not found"));
         assertEditable(competition);
-        // Gender and minimum age are fixed once the competition is created.
         competition.setName(dto.getName());
         competition.setDate(dto.getDate());
         competition.setLapCount(dto.getLapCount());
@@ -127,11 +125,6 @@ public class CompetitionServiceImpl implements CompetitionService {
         cascadeDelete(id);
     }
 
-    /**
-     * Removes a competition together with everything that references it:
-     * medals, results and registrations. Without this, deleting a competition
-     * that already has data fails on foreign-key constraints.
-     */
     private void cascadeDelete(Long competitionId) {
         medalResultRepository.deleteByCompetitionId(competitionId);
         slalomResultRepository.deleteAll(

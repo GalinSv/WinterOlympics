@@ -10,11 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-/**
- * Maps Keycloak realm roles ("realm_access.roles") to Spring authorities.
- * The realm roles are already named ROLE_ADMIN / ROLE_ATHLETE, so they map
- * straight through and work with hasRole("ADMIN") / hasRole("ATHLETE").
- */
 public class KeycloakRoleConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
 
     @Override

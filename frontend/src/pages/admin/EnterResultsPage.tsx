@@ -123,8 +123,6 @@ function EnterResultsPage() {
                 setSlalomResults([]);
             }
 
-            // Seed each row from the saved result so the inputs and the
-            // "Finished?" checkbox reflect what is actually stored.
             const fresh: Record<number, RowState> = {};
             regs.forEach((r) => {
                 const s = slalom.find(

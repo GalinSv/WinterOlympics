@@ -97,7 +97,6 @@ function AdminDashboard() {
                 `Demo complete: "${selectedCompetition.name}" was filled with athletes, scored, ranked, finalized and medals were awarded.`
             );
 
-            // Reflect the new FINISHED status in the dropdown.
             const refreshed = await getAllCompetitions();
             setCompetitions(refreshed);
         } catch (requestError) {

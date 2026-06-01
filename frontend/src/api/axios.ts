@@ -10,7 +10,6 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(async (config) => {
     if (keycloak.authenticated) {
         try {
-            // Refresh the access token if it expires within 30 seconds.
             await keycloak.updateToken(30);
         } catch {
             keycloak.login();

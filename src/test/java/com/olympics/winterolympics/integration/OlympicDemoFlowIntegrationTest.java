@@ -36,7 +36,6 @@ class OlympicDemoFlowIntegrationTest {
 
     @Test
     void slalomDemo_runsFullPipelineAndAwardsThreeMedals() {
-        // Enough eligible men for the demo to register a full field.
         for (int i = 0; i < 14; i++) {
             Athlete a = new Athlete();
             a.setName("Racer " + i);
@@ -57,17 +56,14 @@ class OlympicDemoFlowIntegrationTest {
 
         demoService.runSlalomDemo(competitionId);
 
-        // Competition is finalized.
         assertThat(competitionService.getSlalomCompetitionById(competitionId).getStatus())
                 .isEqualTo(CompetitionStatus.FINISHED);
 
-        // Results were generated and at least the qualifiers were ranked.
         var results =
                 slalomResultRepository.findByRegistrationCompetitionId(competitionId);
         assertThat(results).isNotEmpty();
         assertThat(results.stream().anyMatch(r -> r.getFinalRank() != null)).isTrue();
 
-        // Exactly three medals were awarded and reflected in the statistics.
         assertThat(medalResultRepository.findByCompetitionId(competitionId)).hasSize(3);
         var stats = statisticsService.getStatistics();
         assertThat(stats.getTotalGold()).isEqualTo(1L);
